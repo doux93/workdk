@@ -4212,3 +4212,9 @@ td:first-child {
     font-size: 19px;
   }
 }
+.local-status.unsaved {
+  color: #b16c5e;
+}
+.local-status.unsaved > span {
+  background: #b16c5e;
+}

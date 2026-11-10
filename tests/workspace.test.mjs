@@ -160,3 +160,119 @@ test("重复添加英语模板产生独立的模块和记录，不共享或改�
   assert.deepEqual(learningPresets, presetsBefore);
   assert.throws(() => createModuleFromLearningPreset("unknown"));
 });
+
+test("旧窗口保存时检测已变化的版本，保留新窗口数据并返回冲突", async () => {
+  const { persistWorkspace, blankEntry } = await import("../src/workspace.ts");
+  const original = initialWorkspace();
+  const expected = JSON.stringify(original);
+  const newer = structuredClone(original);
+  newer.modules[0].entries.push({ ...blankEntry(), title: "另一窗口的记录" });
+  const newerRaw = JSON.stringify(newer);
+  let stored = newerRaw;
+  const storage = {
+    getItem: () => stored,
+    setItem: (_, value) => {
+      stored = value;
+    },
+  };
+  const stale = structuredClone(original);
+  stale.name = "旧窗口仍在编辑";
+  assert.deepEqual(persistWorkspace(storage, "workspace", stale, expected), {
+    status: "conflict",
+    raw: newerRaw,
+  });
+  assert.equal(stored, newerRaw);
+  assert.equal(stale.name, "旧窗口仍在编辑");
+});
+
+test("保存失败与无法读取存储时返回错误，不把失败当作已保存", async () => {
+  const { persistWorkspace } = await import("../src/workspace.ts");
+  const workspace = initialWorkspace();
+  let stored = "previous version";
+  const full = {
+    getItem: () => stored,
+    setItem: () => {
+      throw new Error("quota exceeded");
+    },
+  };
+  assert.deepEqual(persistWorkspace(full, "workspace", workspace, stored), {
+    status: "error",
+  });
+  assert.equal(stored, "previous version");
+  const blocked = {
+    getItem: () => {
+      throw new Error("blocked storage");
+    },
+    setItem: () => {
+      throw new Error("should not write");
+    },
+  };
+  assert.deepEqual(persistWorkspace(blocked, "workspace", workspace, null), {
+    status: "error",
+  });
+});
+
+test("已保存的相同内容不会重复写入，另一窗口删除数据会触发冲突", async () => {
+  const { persistWorkspace } = await import("../src/workspace.ts");
+  const workspace = initialWorkspace();
+  const raw = JSON.stringify(workspace);
+  let writes = 0;
+  const storage = {
+    getItem: () => raw,
+    setItem: () => {
+      writes++;
+    },
+  };
+  assert.deepEqual(persistWorkspace(storage, "workspace", workspace, raw), {
+    status: "saved",
+    raw,
+  });
+  assert.equal(writes, 0);
+  assert.deepEqual(
+    persistWorkspace(
+      {
+        getItem: () => null,
+        setItem: () => {
+          writes++;
+        },
+      },
+      "workspace",
+      workspace,
+      raw,
+    ),
+    { status: "conflict", raw: null },
+  );
+  assert.equal(writes, 0);
+});
+
+test("导入校验拒绝不存在的日期、非法时间、空名称和重复字段", async () => {
+  const { isValidDateValue, isValidTimeValue } = await import(
+    "../src/workspace.ts"
+  );
+  for (const value of ["", "2024-02-29", "2000-02-29", "2026-12-31"])
+    assert.equal(isValidDateValue(value), true);
+  for (const value of [
+    "2025-02-29",
+    "1900-02-29",
+    "2026-13-01",
+    "2026-04-31",
+    "0000-01-01",
+  ])
+    assert.equal(isValidDateValue(value), false);
+  for (const value of ["", "00:00", "23:59"])
+    assert.equal(isValidTimeValue(value), true);
+  for (const value of ["24:00", "12:60", "9:00", "12:00:00"])
+    assert.equal(isValidTimeValue(value), false);
+  const badDate = initialWorkspace();
+  badDate.modules[0].entries[0].date = "2026-02-30";
+  assert.equal(validateWorkspace(badDate), false);
+  const badTime = initialWorkspace();
+  badTime.modules[0].entries[0].time = "24:00";
+  assert.equal(validateWorkspace(badTime), false);
+  const blank = initialWorkspace();
+  blank.modules[0].name = "   ";
+  assert.equal(validateWorkspace(blank), false);
+  const duplicate = initialWorkspace();
+  duplicate.modules[0].fields = ["负责人", "负责人"];
+  assert.equal(validateWorkspace(duplicate), false);
+});

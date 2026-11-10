@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -72,6 +72,9 @@ import {
   removeExampleEntries,
   learningPresets,
   createModuleFromLearningPreset,
+  persistWorkspace,
+  isValidDateValue,
+  isValidTimeValue,
 } from "./workspace";
 const ICONS: Record<string, typeof Plus> = {
   check: CheckSquare2,
@@ -170,13 +173,18 @@ function Modal({
   useEffect(() => {
     const prev = document.activeElement as HTMLElement;
     ref.current?.showModal();
-    ref.current?.querySelector<HTMLInputElement>("input,textarea")?.focus();
+    ref.current
+      ?.querySelector<HTMLInputElement>(
+        'input:not([type="checkbox"]):not([type="hidden"]),textarea',
+      )
+      ?.focus();
     return () => {
       if (prev?.isConnected) prev.focus();
     };
   }, []);
   return (
     <dialog
+      aria-label={title}
       ref={ref}
       className={"dialog " + (wide ? "wide" : "")}
       onCancel={(e) => {
@@ -200,6 +208,38 @@ function Modal({
     </dialog>
   );
 }
+function useDraftGuard(
+  formRef: React.RefObject<HTMLFormElement | null>,
+  configurationChanged: boolean,
+  onClose: () => void,
+) {
+  const initialValues = useRef<string | null>(null);
+  const snapshot = () =>
+    formRef.current
+      ? JSON.stringify(Array.from(new FormData(formRef.current).entries()))
+      : null;
+  useEffect(() => {
+    initialValues.current = snapshot();
+  }, []);
+  const dirty = () =>
+    configurationChanged ||
+    (initialValues.current !== null && snapshot() !== initialValues.current);
+  useEffect(() => {
+    const handle = (event: BeforeUnloadEvent) => {
+      if (dirty()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handle);
+    return () => window.removeEventListener("beforeunload", handle);
+  }, [configurationChanged]);
+  return () => {
+    if (!dirty() || window.confirm("有尚未保存的更改，确定放弃这些更改吗？"))
+      onClose();
+  };
+}
+
 export default function App() {
   const [data, setData] = useState<Workspace | null>(null);
   const [route, setRoute] = useState("home");
@@ -215,6 +255,16 @@ export default function App() {
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
   const [entryModule, setEntryModule] = useState("tasks");
   const [query, setQuery] = useState("");
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [storageConflict, setStorageConflict] = useState<{
+    raw: string | null;
+  } | null>(null);
+  const expectedRaw = useRef<string | null>(null);
+  const [lastSavedRaw, setLastSavedRaw] = useState<string | null>(null);
+  const serializedData = useMemo(
+    () => (data ? JSON.stringify(data) : null),
+    [data],
+  );
   const [filter, setFilter] = useState("all");
   const [taskTab, setTaskTab] = useState("active");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -231,7 +281,9 @@ export default function App() {
   } | null>(null);
   useEffect(() => {
     try {
-      const loaded = loadWorkspace(localStorage.getItem(STORE));
+      const raw = localStorage.getItem(STORE);
+      expectedRaw.current = raw;
+      const loaded = loadWorkspace(raw);
       setData(loaded.workspace);
       setRecoveryRaw(loaded.recoveryRaw);
     } catch {
@@ -259,16 +311,41 @@ export default function App() {
   useEffect(() => {
     if (!data) return;
     document.documentElement.dataset.theme = data.theme;
-    if (recoveryRaw !== null) return;
-    try {
-      localStorage.setItem(STORE, JSON.stringify(data));
+    if (recoveryRaw !== null || storageConflict !== null) return;
+    const result = persistWorkspace(
+      {
+        getItem: (key) => window.localStorage.getItem(key),
+        setItem: (key, value) => window.localStorage.setItem(key, value),
+      },
+      STORE,
+      data,
+      expectedRaw.current,
+    );
+    if (result.status === "saved") {
+      expectedRaw.current = result.raw;
+      setLastSavedRaw(result.raw);
       setSaveError("");
-    } catch {
+    } else if (result.status === "conflict") {
+      setStorageConflict({ raw: result.raw });
+    } else {
       setSaveError(
         "自动保存失败，当前更改尚未保存。请导出备份并检查浏览器存储空间。",
       );
     }
-  }, [data, recoveryRaw]);
+  }, [data, recoveryRaw, storageConflict]);
+  useEffect(() => {
+    const handle = (event: StorageEvent) => {
+      if (
+        event.storageArea === localStorage &&
+        (event.key === STORE || event.key === null) &&
+        event.newValue !== expectedRaw.current
+      ) {
+        setStorageConflict({ raw: event.newValue });
+      }
+    };
+    window.addEventListener("storage", handle);
+    return () => window.removeEventListener("storage", handle);
+  }, []);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 760px)");
     const sync = () => setNarrow(media.matches);
@@ -281,7 +358,8 @@ export default function App() {
       if (e.key === "Escape") setSidebar(false);
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setQuery("");
+        if (document.querySelector("dialog[open]")) return;
+        setGlobalQuery("");
         setModal("search");
       }
     };
@@ -387,6 +465,12 @@ export default function App() {
         "恢复工作台备份？",
         `将用备份中的 ${value.modules.length} 个模块替换当前工作台。建议先导出当前数据。`,
         () => {
+          try {
+            expectedRaw.current = localStorage.getItem(STORE);
+          } catch {
+            expectedRaw.current = null;
+          }
+          setStorageConflict(null);
           setRecoveryRaw(null);
           setSaveError("");
           setData(value);
@@ -400,6 +484,27 @@ export default function App() {
       if (importInput.current) importInput.current.value = "";
     }
   };
+  const loadLatest = () => {
+    try {
+      const raw = localStorage.getItem(STORE),
+        loaded = loadWorkspace(raw);
+      expectedRaw.current = raw;
+      setStorageConflict(null);
+      setRecoveryRaw(loaded.recoveryRaw);
+      setSaveError("");
+      setData(loaded.workspace);
+      navigate("home");
+      notify("已载入浏览器中的最新内容。");
+    } catch {
+      setSaveError("暂时无法读取浏览器数据，请先导出当前内容。");
+    }
+  };
+  const saveState =
+    recoveryRaw !== null || storageConflict !== null || saveError
+      ? "未保存"
+      : serializedData === lastSavedRaw
+        ? "已保存"
+        : "保存中";
   if (!data)
     return (
       <div className="loading">
@@ -837,9 +942,18 @@ export default function App() {
             <Settings2 size={18} />
             偏好设置
           </button>
-          <div className="local-status">
+          <div
+            className={
+              "local-status " + (saveState === "未保存" ? "unsaved" : "")
+            }
+            role="status"
+          >
             <span />
-            数据保存在当前浏览器
+            {saveState === "已保存"
+              ? "已保存到当前浏览器"
+              : saveState === "保存中"
+                ? "正在保存更改…"
+                : "当前更改未保存"}
           </div>
         </div>
       </aside>
@@ -863,7 +977,7 @@ export default function App() {
               aria-label="搜索工作空间"
               className="search-trigger"
               onClick={() => {
-                setQuery("");
+                setGlobalQuery("");
                 setModal("search");
               }}
             >
@@ -894,22 +1008,45 @@ export default function App() {
           </div>
         </header>
         <main className="main-content">
-          {(recoveryRaw !== null || saveError) && (
+          {(recoveryRaw !== null || storageConflict !== null || saveError) && (
             <section className="storage-warning" role="alert">
               <div>
                 <b>
-                  {recoveryRaw !== null
-                    ? "检测到无法读取的数据，自动保存已暂停"
-                    : "当前内容尚未保存"}
+                  {storageConflict
+                    ? "另一个窗口更新了工作台，当前窗口已暂停保存"
+                    : recoveryRaw !== null
+                      ? "检测到无法读取的数据，自动保存已暂停"
+                      : "当前内容尚未保存"}
                 </b>
                 <p>
-                  {recoveryRaw !== null
-                    ? "原始数据仍保留在浏览器中。请先下载原始数据，再恢复有效备份；当前显示的体验内容不会覆盖它。"
-                    : saveError}
+                  {storageConflict
+                    ? "当前窗口的内容仍然保留。可以先导出当前内容，再载入另一个窗口保存的最新版本。"
+                    : recoveryRaw !== null
+                      ? "原始数据仍保留在浏览器中。请先下载原始数据，再恢复有效备份；当前显示的体验内容不会覆盖它。"
+                      : saveError}
                 </p>
               </div>
               <div className="button-row">
-                {recoveryRaw !== null ? (
+                {storageConflict ? (
+                  <>
+                    <button className="button" onClick={exportData}>
+                      <Download size={15} />
+                      导出当前内容
+                    </button>
+                    <button
+                      className="button"
+                      onClick={() =>
+                        askConfirm(
+                          "载入最新内容？",
+                          "当前窗口中尚未保存的更改将被替换。如需保留，请先导出当前内容。",
+                          loadLatest,
+                        )
+                      }
+                    >
+                      载入最新内容
+                    </button>
+                  </>
+                ) : recoveryRaw !== null ? (
                   <>
                     <button className="button" onClick={exportRecovery}>
                       <Download size={15} />
@@ -1751,7 +1888,9 @@ export default function App() {
                     setSelected={setSelectedDate}
                   />
                   <div className="module-footer">
-                    <span>{current.entries.length} 条内容 · 自动保存</span>
+                    <span>
+                      {current.entries.length} 条内容 · {saveState}
+                    </span>
                     <span>
                       <CheckCheck size={14} />
                       切换模板不会丢失内容
@@ -1816,7 +1955,7 @@ export default function App() {
                 : [entry, ...m.entries],
             }));
             setModal(null);
-            notify("内容已保存。");
+            notify("内容已更新。");
           }}
         />
       )}
@@ -1831,8 +1970,8 @@ export default function App() {
             <Search size={20} />
             <input
               autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={globalQuery}
+              onChange={(e) => setGlobalQuery(e.target.value)}
               placeholder="想找点什么？"
               aria-label="全局搜索"
             />
@@ -1842,7 +1981,8 @@ export default function App() {
             {data.modules
               .filter(
                 (m) =>
-                  !query || m.name.toLowerCase().includes(query.toLowerCase()),
+                  !globalQuery ||
+                  m.name.toLowerCase().includes(globalQuery.toLowerCase()),
               )
               .map((m) => (
                 <button
@@ -1862,13 +2002,14 @@ export default function App() {
                   <ArrowUpRight size={16} />
                 </button>
               ))}
-            {query &&
+            {globalQuery &&
               data.modules
                 .flatMap((m) =>
                   m.entries
                     .filter((e) =>
                       [e.title, e.description, ...Object.values(e.values)].some(
-                        (s) => s.toLowerCase().includes(query.toLowerCase()),
+                        (s) =>
+                          s.toLowerCase().includes(globalQuery.toLowerCase()),
                       ),
                     )
                     .map((e) => (
@@ -1894,13 +2035,14 @@ export default function App() {
                     )),
                 )
                 .slice(0, 30)}
-            {query &&
+            {globalQuery &&
               !data.modules.some(
                 (m) =>
-                  m.name.toLowerCase().includes(query.toLowerCase()) ||
+                  m.name.toLowerCase().includes(globalQuery.toLowerCase()) ||
                   m.entries.some((e) =>
                     [e.title, e.description, ...Object.values(e.values)].some(
-                      (s) => s.toLowerCase().includes(query.toLowerCase()),
+                      (s) =>
+                        s.toLowerCase().includes(globalQuery.toLowerCase()),
                     ),
                   ),
               ) && <Empty title="暂时没有找到" detail="换一个关键词试试。" />}
@@ -2505,6 +2647,16 @@ function ModuleEditor({
   const [icon, setIcon] = useState(m?.icon || "check");
   const [includeSamples, setIncludeSamples] = useState(true);
   const hasPresetSamples = !m?.id && !!m?.entries.length;
+  const [error, setError] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  const requestClose = useDraftGuard(
+    formRef,
+    view !== (m?.view || "list") ||
+      color !== (m?.color || "green") ||
+      icon !== (m?.icon || "check") ||
+      !includeSamples,
+    onClose,
+  );
   return (
     <Modal
       title={m?.id ? "编辑模块" : "为日常，新增一个空间"}
@@ -2515,15 +2667,19 @@ function ModuleEditor({
             ? `已预设「${m.name}」的字段与视图，可自由修改。`
             : "选一个模板，剩下的交给工作台。"
       }
-      onClose={onClose}
+      onClose={requestClose}
       wide
     >
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const name = String(f.get("name") || "").trim();
-          if (!name) return;
+          if (!name) {
+            setError("请填写模块名称，不能只包含空格。");
+            return;
+          }
           const fields = [
             ...new Set(
               String(f.get("fields") || "")
@@ -2658,6 +2814,11 @@ function ModuleEditor({
               用逗号分隔，最多 12 个字段。将显示在记录编辑和详情页中。
             </span>
           </label>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <div className="module-preview">
             <span className={"module-icon tone-" + color}>
               <Icon name={icon} />
@@ -2673,7 +2834,7 @@ function ModuleEditor({
           </div>
         </div>
         <div className="modal-footer">
-          <button type="button" className="button" onClick={onClose}>
+          <button type="button" className="button" onClick={requestClose}>
             取消
           </button>
           <button className="button primary" type="submit">
@@ -2698,14 +2859,17 @@ function RecordEditor({
 }) {
   const existing = m.entries.some((e) => e.id === entry.id);
   const [error, setError] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  const requestClose = useDraftGuard(formRef, false, onClose);
   return (
     <Modal
       title={existing ? "编辑内容" : "记录一件新的事"}
       subtitle={m.name + " · 自动关联到当前模块"}
-      onClose={onClose}
+      onClose={requestClose}
       wide
     >
       <form
+        ref={formRef}
         onSubmit={(event) => {
           event.preventDefault();
           const f = new FormData(event.currentTarget);
@@ -2717,6 +2881,13 @@ function RecordEditor({
           }
           if (url && !safeUrl(url)) {
             setError("请输入以 https:// 或 http:// 开头的有效网址。");
+            return;
+          }
+          if (
+            !isValidDateValue(String(f.get("date") || "")) ||
+            !isValidTimeValue(String(f.get("time") || ""))
+          ) {
+            setError("请填写有效的日期与时间。");
             return;
           }
           const values = { ...entry.values };
@@ -2823,7 +2994,7 @@ function RecordEditor({
           )}
         </div>
         <div className="modal-footer">
-          <button className="button" type="button" onClick={onClose}>
+          <button className="button" type="button" onClick={requestClose}>
             取消
           </button>
           <button className="button primary" type="submit">

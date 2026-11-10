@@ -256,13 +256,15 @@ export function validateWorkspace(x: unknown): x is Workspace {
           typeof m.id === "string" &&
           /^[\w-]+$/.test(m.id) &&
           typeof m.name === "string" &&
+          m.name.trim().length > 0 &&
           typeof m.description === "string" &&
           typeof m.icon === "string" &&
           colors.includes(m.color) &&
           views.some((v) => v.id === m.view) &&
           typeof m.hidden === "boolean" &&
           Array.isArray(m.fields) &&
-          m.fields.every((f) => typeof f === "string") &&
+          m.fields.every((f) => typeof f === "string" && f.trim().length > 0) &&
+          new Set(m.fields).size === m.fields.length &&
           Array.isArray(m.entries) &&
           new Set(m.entries.map((e) => e.id)).size === m.entries.length &&
           m.entries.every(
@@ -271,12 +273,14 @@ export function validateWorkspace(x: unknown): x is Workspace {
               typeof e.id === "string" &&
               /^[\w-]+$/.test(e.id) &&
               typeof e.title === "string" &&
+              e.title.trim().length > 0 &&
               typeof e.description === "string" &&
               ["todo", "doing", "done"].includes(e.status) &&
               ["普通", "重要", "紧急"].includes(e.priority) &&
               typeof e.date === "string" &&
-              (!e.date || /^\d{4}-\d{2}-\d{2}$/.test(e.date)) &&
+              isValidDateValue(e.date) &&
               typeof e.time === "string" &&
+              isValidTimeValue(e.time) &&
               typeof e.url === "string" &&
               typeof e.created === "string" &&
               (e.sample === undefined || typeof e.sample === "boolean") &&
@@ -532,4 +536,51 @@ export function createModuleFromLearningPreset(presetId: string): Module {
       };
     }),
   };
+}
+
+export function isValidDateValue(value: string): boolean {
+  if (!value) return true;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText),
+    month = Number(monthText),
+    day = Number(dayText);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return (
+    day <=
+    [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+  );
+}
+
+export function isValidTimeValue(value: string): boolean {
+  return !value || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+export type WorkspaceSaveResult =
+  | { status: "saved"; raw: string }
+  | { status: "conflict"; raw: string | null }
+  | { status: "error" };
+
+/** Preserve another window's version instead of silently overwriting it. */
+export function persistWorkspace(
+  storage: {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+  },
+  key: string,
+  workspace: Workspace,
+  expectedRaw: string | null,
+): WorkspaceSaveResult {
+  try {
+    const nextRaw = JSON.stringify(workspace);
+    const currentRaw = storage.getItem(key);
+    if (currentRaw !== expectedRaw && currentRaw !== nextRaw)
+      return { status: "conflict", raw: currentRaw };
+    if (currentRaw !== nextRaw) storage.setItem(key, nextRaw);
+    return { status: "saved", raw: nextRaw };
+  } catch {
+    return { status: "error" };
+  }
 }
