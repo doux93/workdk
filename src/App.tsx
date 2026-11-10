@@ -49,6 +49,10 @@ import {
   Palette,
   Maximize2,
   CheckCircle2,
+  BookOpen,
+  Headphones,
+  Mic,
+  Languages,
 } from "lucide-react";
 import {
   type Entry,
@@ -66,6 +70,8 @@ import {
   safeUrl,
   loadWorkspace,
   removeExampleEntries,
+  learningPresets,
+  createModuleFromLearningPreset,
 } from "./workspace";
 const ICONS: Record<string, typeof Plus> = {
   check: CheckSquare2,
@@ -78,6 +84,10 @@ const ICONS: Record<string, typeof Plus> = {
   grid: Grid2X2,
   bookmark: Bookmark,
   sparkles: Sparkles,
+  book: BookOpen,
+  headphones: Headphones,
+  mic: Mic,
+  languages: Languages,
 };
 function Icon({
   name,
@@ -1111,10 +1121,23 @@ export default function App() {
                   </h1>
                   <p>布局可以改变，你的内容始终保留。</p>
                 </div>
-                <button className="button" onClick={() => navigate("home")}>
-                  <ArrowLeft size={16} />
-                  返回工作台
-                </button>
+                <div className="button-row">
+                  <button
+                    className="button"
+                    onClick={() =>
+                      document
+                        .getElementById("english-learning-templates")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                  >
+                    <Languages size={16} />
+                    英语学习<span className="template-count">4</span>
+                  </button>
+                  <button className="button" onClick={() => navigate("home")}>
+                    <ArrowLeft size={16} />
+                    返回工作台
+                  </button>
+                </div>
               </div>
               <div className="section-heading">
                 <h2>
@@ -1191,6 +1214,136 @@ export default function App() {
                   </article>
                 ))}
               </div>
+              <section
+                id="english-learning-templates"
+                className="learning-section"
+              >
+                <div className="section-heading">
+                  <h2>
+                    <Languages size={18} />
+                    英语学习<span>每天一点，慢慢变成自己的表达</span>
+                  </h2>
+                  <span className="subtle-label">4 款学习模板</span>
+                </div>
+                <div className="learning-template-grid">
+                  {learningPresets.map((preset) => (
+                    <article
+                      className={"learning-template-card learning-" + preset.id}
+                      key={preset.id}
+                    >
+                      <div
+                        className={"learning-art tone-" + preset.color}
+                        aria-hidden="true"
+                      >
+                        <span className="learning-art-label">
+                          {preset.english}
+                        </span>
+                        {preset.id === "vocabulary" ? (
+                          <div className="word-preview">
+                            <b>
+                              clarify<span>v.</span>
+                            </b>
+                            <p>澄清 · 讲清楚</p>
+                            <small>Could you clarify the deadline?</small>
+                          </div>
+                        ) : preset.id === "daily-english" ? (
+                          <div className="habit-preview">
+                            <div>
+                              {["M", "T", "W", "T", "F", "S", "S"].map(
+                                (day, index) => (
+                                  <span key={index}>
+                                    <small>{day}</small>
+                                    <i
+                                      className={
+                                        index < 2
+                                          ? "checked"
+                                          : index === 2
+                                            ? "current"
+                                            : ""
+                                      }
+                                    >
+                                      {index < 2 ? (
+                                        <Check size={15} />
+                                      ) : index === 2 ? (
+                                        "15′"
+                                      ) : (
+                                        "·"
+                                      )}
+                                    </i>
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                            <p>A little progress, every day.</p>
+                          </div>
+                        ) : preset.id === "listening-reading" ? (
+                          <div className="listening-preview">
+                            <span className="listening-play">
+                              <Headphones size={24} />
+                            </span>
+                            <div className="sound-wave">
+                              {[
+                                13, 25, 36, 20, 44, 32, 17, 29, 42, 23, 14, 31,
+                                20, 37, 15,
+                              ].map((height, index) => (
+                                <i key={index} style={{ height }} />
+                              ))}
+                            </div>
+                            <p>听见表达，也听懂语境。</p>
+                          </div>
+                        ) : (
+                          <div className="speaking-preview">
+                            <span>
+                              <Mic size={17} />
+                              Could you clarify…?
+                            </span>
+                            <p>Say it in your own words.</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="learning-card-content">
+                        <div className="learning-card-title">
+                          <h3>
+                            <Icon name={preset.icon} size={18} />
+                            {preset.name}
+                          </h3>
+                          <span>
+                            {views
+                              .find((v) => v.id === preset.view)
+                              ?.name.slice(2)}
+                            视图
+                          </span>
+                        </div>
+                        <p>{preset.description}</p>
+                        <div className="learning-field-tags">
+                          {preset.fields.map((field) => (
+                            <span key={field}>{field}</span>
+                          ))}
+                        </div>
+                        <div className="learning-card-footer">
+                          <small>
+                            {preset.examples.length} 条可选示例 · 字段可修改
+                          </small>
+                          <button
+                            className="button"
+                            aria-label={"使用" + preset.name + "模板"}
+                            onClick={() => {
+                              setEditModule({
+                                ...createModuleFromLearningPreset(preset.id),
+                                id: "",
+                              });
+                              setModal("module");
+                            }}
+                          >
+                            使用模板
+                            <Plus size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
               <div className="section-heading spaced">
                 <h2>
                   模块页面模板<span>同一份内容，用不同的方式看待</span>
@@ -1638,7 +1791,11 @@ export default function App() {
               changeModule(m.id, () => m);
               notify("模块已更新，已有内容已保留。");
             } else {
-              update((d) => ({ ...d, modules: [...d.modules, m] }));
+              update((d) => ({
+                ...d,
+                example: d.example || m.entries.some((e) => e.sample === true),
+                modules: [...d.modules, m],
+              }));
               navigate(`modules/${m.id}`);
               notify("模块已创建，页面和导航入口已就绪。");
             }
@@ -2346,13 +2503,17 @@ function ModuleEditor({
   const [view, setView] = useState<View>(m?.view || "list");
   const [color, setColor] = useState(m?.color || "green");
   const [icon, setIcon] = useState(m?.icon || "check");
+  const [includeSamples, setIncludeSamples] = useState(true);
+  const hasPresetSamples = !m?.id && !!m?.entries.length;
   return (
     <Modal
       title={m?.id ? "编辑模块" : "为日常，新增一个空间"}
       subtitle={
         m?.id
           ? "更换模板、调整字段，已有内容会继续保留。"
-          : "选一个模板，剩下的交给工作台。"
+          : m?.name
+            ? `已预设「${m.name}」的字段与视图，可自由修改。`
+            : "选一个模板，剩下的交给工作台。"
       }
       onClose={onClose}
       wide
@@ -2380,11 +2541,25 @@ function ModuleEditor({
             view,
             fields,
             hidden: m?.hidden || false,
-            entries: m?.entries || [],
+            entries:
+              hasPresetSamples && !includeSamples ? [] : m?.entries || [],
           });
         }}
       >
         <div className="form-body">
+          {hasPresetSamples && (
+            <label className="include-samples">
+              <input
+                type="checkbox"
+                checked={includeSamples}
+                onChange={(e) => setIncludeSamples(e.target.checked)}
+              />
+              <span>
+                <b>附带 {m!.entries.length} 条学习示例</b>
+                <small>帮助你了解怎么记录；取消勾选即可从空白开始。</small>
+              </span>
+            </label>
+          )}
           <div className="form-grid">
             <label>
               模块名称 <span>*</span>
@@ -2435,6 +2610,10 @@ function ModuleEditor({
                   "bookmark",
                   "sparkles",
                   "grid",
+                  "book",
+                  "headphones",
+                  "mic",
+                  "languages",
                 ].map((i) => (
                   <button
                     type="button"

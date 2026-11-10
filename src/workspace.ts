@@ -324,3 +324,212 @@ export function removeExampleEntries(workspace: Workspace): Workspace {
     })),
   };
 }
+
+export type LearningPreset = {
+  id: string;
+  name: string;
+  english: string;
+  description: string;
+  icon: string;
+  color: string;
+  view: View;
+  fields: string[];
+  examples: {
+    title: string;
+    description: string;
+    values: Record<string, string>;
+    status?: Entry["status"];
+    dayOffset?: number;
+  }[];
+};
+
+export const learningPresets: LearningPreset[] = [
+  {
+    id: "vocabulary",
+    name: "我的单词本",
+    english: "WORDS IN CONTEXT",
+    description: "把工作和生活中遇到的词，变成自己会用的表达。",
+    icon: "book",
+    color: "green",
+    view: "list",
+    fields: ["中文释义", "例句", "熟悉程度", "复习计划"],
+    examples: [
+      {
+        title: "clarify",
+        description: "用自己的话写一个例句，再试着在真实沟通中使用。",
+        values: {
+          中文释义: "澄清；讲清楚",
+          例句: "Could you clarify the deadline?",
+          熟悉程度: "见过，正在练习",
+          复习计划: "明天用这个词造一个新句子",
+        },
+        status: "doing",
+      },
+      {
+        title: "prioritize",
+        description: "记录一个你今天需要优先处理的事项。",
+        values: {
+          中文释义: "按优先顺序处理",
+          例句: "We need to prioritize the most important tasks.",
+          熟悉程度: "新词",
+          复习计划: "下次复习时遮住释义回想",
+        },
+      },
+      {
+        title: "consistent",
+        description: "把词汇和一个熟悉的情境联系起来。",
+        values: {
+          中文释义: "持续一致的；一贯的",
+          例句: "Small, consistent efforts can make a difference.",
+          熟悉程度: "新词",
+          复习计划: "本周复习并补充自己的例句",
+        },
+      },
+    ],
+  },
+  {
+    id: "daily-english",
+    name: "英语每日打卡",
+    english: "A LITTLE, EVERY DAY",
+    description: "给英语留一小段时间，让每次练习都看得见。",
+    icon: "calendar",
+    color: "blue",
+    view: "calendar",
+    fields: ["学习时长（分钟）", "学习内容", "今日收获"],
+    examples: [
+      {
+        title: "15 分钟，开启今天的英语",
+        description:
+          "选一小段材料，听一遍、读一遍，记下一个有用的表达。完成后填写实际学习时长。",
+        values: {
+          "学习时长（分钟）": "",
+          学习内容: "听读一段短材料",
+          今日收获: "",
+        },
+      },
+      {
+        title: "复习昨天记下的表达",
+        description: "先回忆，再对照笔记检查。选一个表达造句。",
+        values: {
+          "学习时长（分钟）": "",
+          学习内容: "词汇与表达复习",
+          今日收获: "",
+        },
+        dayOffset: 1,
+      },
+      {
+        title: "一周学习小回顾",
+        description: "哪些内容能主动用出来？下周准备继续练什么？",
+        values: { "学习时长（分钟）": "", 学习内容: "学习复盘", 今日收获: "" },
+        dayOffset: 6,
+      },
+    ],
+  },
+  {
+    id: "listening-reading",
+    name: "听力与精读",
+    english: "LISTEN. NOTICE. REPEAT.",
+    description: "留住材料、关键表达和理解过程，反复练得更扎实。",
+    icon: "headphones",
+    color: "orange",
+    view: "notes",
+    fields: ["材料链接", "关键表达", "理解程度", "下一步"],
+    examples: [
+      {
+        title: "一段材料，分三次听",
+        description:
+          "第一次：不看文本，抓住主题和大意。\n\n第二次：对照文本，标出没听清的地方和想学的表达。\n\n第三次：再听一遍，用两三句话概括内容。\n\n把自己的材料链接与笔记补充在下方字段中。",
+        values: {
+          材料链接: "",
+          关键表达: "",
+          理解程度: "待练习",
+          下一步: "选一段长度适合自己的材料",
+        },
+      },
+      {
+        title: "精读笔记：从理解到运用",
+        description:
+          "主题：这段内容主要讲什么？\n\n表达：有哪些值得记住的词组或句式？\n\n复述：合上原文，用自己的话写一小段总结。\n\n应用：这个表达可以用在什么工作或生活场景？",
+        values: {
+          材料链接: "",
+          关键表达: "",
+          理解程度: "待练习",
+          下一步: "填入自己的第一篇精读笔记",
+        },
+      },
+    ],
+  },
+  {
+    id: "speaking",
+    name: "口语练习计划",
+    english: "FIND YOUR OWN VOICE",
+    description: "按场景准备、开口练习、记录回顾，让想法说得出来。",
+    icon: "mic",
+    color: "purple",
+    view: "board",
+    fields: ["练习场景", "目标表达", "录音链接", "自评与改进"],
+    examples: [
+      {
+        title: "用一分钟介绍今天的工作",
+        description:
+          "先列三个关键词，再脱稿说一分钟。回听时记录一个说得顺的地方和一个想改进的地方。",
+        values: {
+          练习场景: "工作介绍",
+          目标表达: "Today I am working on…",
+          录音链接: "",
+          自评与改进: "",
+        },
+        status: "doing",
+      },
+      {
+        title: "向同事确认需求",
+        description:
+          "练习礼貌地确认目标、范围和截止时间，尝试换一种说法表达同一意思。",
+        values: {
+          练习场景: "需求沟通",
+          目标表达: "Could you clarify what you need by Friday?",
+          录音链接: "",
+          自评与改进: "",
+        },
+      },
+      {
+        title: "复述一段学习内容",
+        description: "看完一段材料后，离开原文，用自己的话讲出主题和两个要点。",
+        values: {
+          练习场景: "内容复述",
+          目标表达: "The main idea is…",
+          录音链接: "",
+          自评与改进: "",
+        },
+      },
+    ],
+  },
+];
+
+export function createModuleFromLearningPreset(presetId: string): Module {
+  const preset = learningPresets.find((p) => p.id === presetId);
+  if (!preset) throw new Error("Unknown learning template");
+  return {
+    id: uid(),
+    name: preset.name,
+    description: preset.description,
+    icon: preset.icon,
+    color: preset.color,
+    view: preset.view,
+    fields: [...preset.fields],
+    hidden: false,
+    entries: preset.examples.map((example) => {
+      const date = new Date();
+      date.setDate(date.getDate() + (example.dayOffset || 0));
+      return {
+        ...blankEntry(),
+        title: example.title,
+        description: example.description,
+        values: { ...example.values },
+        status: example.status || "todo",
+        date: dateKey(date),
+        sample: true,
+      };
+    }),
+  };
+}

@@ -37,7 +37,9 @@ test("损坏备份被拒绝，验证器不崩溃", () => {
   assert.equal(validateWorkspace(badEntry), false);
 });
 test("旧版本备份没有示例标记时仍完整保留用户数据", async () => {
-  const { loadWorkspace, removeExampleEntries } = await import("../src/workspace.ts");
+  const { loadWorkspace, removeExampleEntries } = await import(
+    "../src/workspace.ts"
+  );
   const legacy = initialWorkspace();
   for (const module of legacy.modules) {
     for (const entry of module.entries) delete entry.sample;
@@ -116,4 +118,45 @@ test("清理示例保留新增记录、编辑过的示例、自定义模块及�
     workspace.modules[0].entries.length > result.modules[0].entries.length,
     true,
   );
+});
+
+test("四款英语模板创建后符合备份格式，字段和学习内容可完整恢复", async () => {
+  const { learningPresets, createModuleFromLearningPreset, loadWorkspace } =
+    await import("../src/workspace.ts");
+  const workspace = initialWorkspace();
+  const before = structuredClone(workspace.modules);
+  const learning = learningPresets.map((preset) =>
+    createModuleFromLearningPreset(preset.id),
+  );
+  workspace.modules.push(...learning);
+  assert.equal(validateWorkspace(workspace), true);
+  const restored = loadWorkspace(JSON.stringify(workspace));
+  assert.equal(restored.recoveryRaw, null);
+  assert.deepEqual(restored.workspace.modules.slice(before.length), learning);
+  assert.deepEqual(restored.workspace.modules.slice(0, before.length), before);
+  for (const module of learning) {
+    assert.equal(module.entries.length > 0, true);
+    for (const entry of module.entries)
+      assert.deepEqual(
+        Object.keys(entry.values).sort(),
+        [...module.fields].sort(),
+      );
+  }
+});
+
+test("重复添加英语模板产生独立的模块和记录，不共享或改写预设数据", async () => {
+  const { learningPresets, createModuleFromLearningPreset } = await import(
+    "../src/workspace.ts"
+  );
+  const presetsBefore = structuredClone(learningPresets);
+  const first = createModuleFromLearningPreset("vocabulary");
+  const second = createModuleFromLearningPreset("vocabulary");
+  assert.notEqual(first.id, second.id);
+  const allIds = [...first.entries, ...second.entries].map((entry) => entry.id);
+  assert.equal(new Set(allIds).size, allIds.length);
+  first.fields.push("自己的字段");
+  first.entries[0].values["中文释义"] = "我的笔记";
+  assert.notEqual(second.entries[0].values["中文释义"], "我的笔记");
+  assert.deepEqual(learningPresets, presetsBefore);
+  assert.throws(() => createModuleFromLearningPreset("unknown"));
 });
