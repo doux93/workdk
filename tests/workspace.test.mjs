@@ -276,3 +276,89 @@ test("导入校验拒绝不存在的日期、非法时间、空名称和重复�
   duplicate.modules[0].fields = ["负责人", "负责人"];
   assert.equal(validateWorkspace(duplicate), false);
 });
+
+test("字段类型元数据能随备份恢复，旧记录仍按名称保留", async () => {
+  const {
+    createModuleFromLearningPreset,
+    getFieldDefinition,
+    loadWorkspace,
+    validateCustomFieldValues,
+  } = await import("../src/workspace.ts");
+  const workspace = initialWorkspace();
+  const module = createModuleFromLearningPreset("daily-english");
+  assert.equal(getFieldDefinition(module, "学习时长（分钟）").type, "number");
+  workspace.modules.push(module);
+  const restored = loadWorkspace(JSON.stringify(workspace));
+  assert.equal(restored.recoveryRaw, null);
+  assert.deepEqual(
+    restored.workspace.modules.at(-1).fieldConfig,
+    module.fieldConfig,
+  );
+  delete module.fieldConfig;
+  assert.equal(getFieldDefinition(module, "学习时长（分钟）").type, "number");
+  const legacy = { "学习时长（分钟）": "十五分钟" };
+  assert.equal(validateCustomFieldValues(module, legacy, legacy), null);
+  assert.match(
+    validateCustomFieldValues(
+      module,
+      { "学习时长（分钟）": "不是数字" },
+      legacy,
+    ),
+    /数字/,
+  );
+});
+
+test("数字与选项校验限制新输入，不清空原有自定义等级", async () => {
+  const {
+    fieldValueError,
+    validateCustomFieldValues,
+    createModuleFromLearningPreset,
+  } = await import("../src/workspace.ts");
+  const definition = { type: "number", min: 0, max: 1440, step: 1 };
+  assert.equal(fieldValueError(definition, "25"), null);
+  for (const value of ["-1", "1441", "1.5", "0x10", "+15", " 15 ", "Infinity"])
+    assert.ok(fieldValueError(definition, value));
+  const module = createModuleFromLearningPreset("vocabulary");
+  const legacy = { 熟悉程度: "我的等级" };
+  assert.equal(validateCustomFieldValues(module, legacy, legacy), null);
+  assert.match(
+    validateCustomFieldValues(module, { 熟悉程度: "未知的新选项" }, legacy),
+    /选项/,
+  );
+  assert.equal(
+    validateCustomFieldValues(module, { 熟悉程度: "基本掌握" }, legacy),
+    null,
+  );
+});
+
+test("损坏字段配置被拒绝，类型设置在不同模块间独立", async () => {
+  const { createModuleFromLearningPreset } = await import(
+    "../src/workspace.ts"
+  );
+  const workspace = initialWorkspace();
+  const first = createModuleFromLearningPreset("vocabulary"),
+    second = createModuleFromLearningPreset("vocabulary");
+  first.fieldConfig.熟悉程度.options.push("我的选项");
+  assert.equal(second.fieldConfig.熟悉程度.options.includes("我的选项"), false);
+  workspace.modules.push(first);
+  assert.equal(validateWorkspace(workspace), true);
+  first.fieldConfig.熟悉程度 = { type: "select", options: [] };
+  assert.equal(validateWorkspace(workspace), false);
+  first.fieldConfig.熟悉程度 = { type: "number", min: 100, max: 0 };
+  assert.equal(validateWorkspace(workspace), false);
+});
+
+test("搜索结果有上限，筛选仍可定位数据集末尾的记录", async () => {
+  const { searchWorkspace, filterEntries } = await import("../src/search.ts");
+  const { createLargeWorkspace } = await import("./fixtures.mjs");
+  const data = createLargeWorkspace(10000);
+  const results = searchWorkspace(data.modules, "单词");
+  assert.equal(results.entries.length, 30);
+  assert.equal(results.hasMore, true);
+  const last = searchWorkspace(data.modules, "benchmark-value-9999。");
+  assert.equal(last.entries[0].entry.id, "entry-9999");
+  assert.equal(
+    filterEntries(data.modules[0].entries, "benchmark-value-9999。").length,
+    1,
+  );
+});

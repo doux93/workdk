@@ -4218,3 +4218,123 @@ td:first-child {
 .local-status.unsaved > span {
   background: #b16c5e;
 }
+.custom-field-link {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.custom-field-link:hover {
+  text-decoration: underline;
+}
+.custom-field-link svg {
+  flex-shrink: 0;
+}
+.custom-field-option {
+  display: inline-block;
+  border-radius: 5px;
+  background: var(--soft);
+  color: var(--accent);
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.field-unit {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.field-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.field-config-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 115px;
+  gap: 9px;
+  align-items: center;
+}
+.field-config-row > b {
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.field-config-row > label {
+  grid-column: 1/-1;
+}
+.field-config-row > select {
+  font-size: 12px;
+}
+.field-config-caption {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.search-limit-note {
+  padding: 12px 20px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .field-config-row {
+    grid-template-columns: minmax(0, 1fr) 105px;
+  }
+  .field-config-row > select {
+    font-size: 14px;
+  }
+}
+.record-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 21px;
+  gap: 15px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+.record-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.record-pagination .button {
+  font-size: 11px;
+}
+.batch-load {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  margin-top: 12px;
+  background: var(--panel);
+}
+.batch-load:hover {
+  background: var(--soft);
+}
+.wide-load {
+  grid-column: 1/-1;
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .record-pagination {
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+  }
+  .record-pagination > div {
+    justify-content: space-between;
+    width: 100%;
+  }
+}

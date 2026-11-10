@@ -1,0 +1,97 @@
+{
+  "generatedAt": "2026-11-10T14:58:10.062Z",
+  "runtime": "v24.22.1",
+  "platform": "linux",
+  "samples": 5,
+  "budgetsMs": {
+    "validate": 2000,
+    "backupRoundtrip": 2000,
+    "search": 1000,
+    "filter": 1000,
+    "persistMemory": 2000
+  },
+  "scope": "Synthetic data CPU and in-memory persistence. This is not a browser storage quota or frame-rate benchmark.",
+  "results": [
+    {
+      "records": 1000,
+      "jsonBytes": 394673,
+      "jsonMiB": 0.38,
+      "timings": {
+        "validate": {
+          "medianMs": 0.7,
+          "p95Ms": 0.91
+        },
+        "backupRoundtrip": {
+          "medianMs": 2.84,
+          "p95Ms": 3.26
+        },
+        "search": {
+          "medianMs": 0.46,
+          "p95Ms": 0.51
+        },
+        "filter": {
+          "medianMs": 0.42,
+          "p95Ms": 0.79
+        },
+        "persistMemory": {
+          "medianMs": 0.9,
+          "p95Ms": 0.96
+        }
+      }
+    },
+    {
+      "records": 5000,
+      "jsonBytes": 1994233,
+      "jsonMiB": 1.9,
+      "timings": {
+        "validate": {
+          "medianMs": 1.97,
+          "p95Ms": 4.12
+        },
+        "backupRoundtrip": {
+          "medianMs": 12.83,
+          "p95Ms": 14.37
+        },
+        "search": {
+          "medianMs": 1.87,
+          "p95Ms": 2.26
+        },
+        "filter": {
+          "medianMs": 2.02,
+          "p95Ms": 2.27
+        },
+        "persistMemory": {
+          "medianMs": 4.54,
+          "p95Ms": 5.15
+        }
+      }
+    },
+    {
+      "records": 10000,
+      "jsonBytes": 3993673,
+      "jsonMiB": 3.81,
+      "timings": {
+        "validate": {
+          "medianMs": 5.31,
+          "p95Ms": 6.36
+        },
+        "backupRoundtrip": {
+          "medianMs": 27.6,
+          "p95Ms": 29.49
+        },
+        "search": {
+          "medianMs": 4.27,
+          "p95Ms": 8.4
+        },
+        "filter": {
+          "medianMs": 7.47,
+          "p95Ms": 7.66
+        },
+        "persistMemory": {
+          "medianMs": 9.89,
+          "p95Ms": 11.69
+        }
+      }
+    }
+  ]
+}

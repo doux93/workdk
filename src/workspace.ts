@@ -20,6 +20,7 @@ export type Module = {
   color: string;
   view: View;
   fields: string[];
+  fieldConfig?: FieldConfig;
   hidden: boolean;
   entries: Entry[];
 };
@@ -265,6 +266,7 @@ export function validateWorkspace(x: unknown): x is Workspace {
           Array.isArray(m.fields) &&
           m.fields.every((f) => typeof f === "string" && f.trim().length > 0) &&
           new Set(m.fields).size === m.fields.length &&
+          (m.fieldConfig === undefined || validateFieldConfig(m.fieldConfig)) &&
           Array.isArray(m.entries) &&
           new Set(m.entries.map((e) => e.id)).size === m.entries.length &&
           m.entries.every(
@@ -521,6 +523,12 @@ export function createModuleFromLearningPreset(presetId: string): Module {
     color: preset.color,
     view: preset.view,
     fields: [...preset.fields],
+    fieldConfig: Object.fromEntries(
+      preset.fields.map((field) => [
+        field,
+        structuredClone(getFieldDefinition({}, field)),
+      ]),
+    ),
     hidden: false,
     entries: preset.examples.map((example) => {
       const date = new Date();
@@ -583,4 +591,124 @@ export function persistWorkspace(
   } catch {
     return { status: "error" };
   }
+}
+
+export type FieldType = "text" | "number" | "select" | "url";
+export type FieldDefinition = {
+  type: FieldType;
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+};
+export type FieldConfig = Record<string, FieldDefinition>;
+export const fieldTypeLabels: Record<FieldType, string> = {
+  text: "文本",
+  number: "数字",
+  select: "选项",
+  url: "链接",
+};
+
+/** Old English modules gain suitable controls without rewriting their values. */
+export function getFieldDefinition(
+  module: Pick<Module, "fieldConfig">,
+  field: string,
+): FieldDefinition {
+  if (module.fieldConfig?.[field]) return module.fieldConfig[field];
+  if (field === "学习时长（分钟）")
+    return { type: "number", min: 0, max: 1440, step: 1, unit: "分钟" };
+  if (field === "熟悉程度")
+    return {
+      type: "select",
+      options: ["新词", "见过，正在练习", "基本掌握", "熟练运用"],
+    };
+  if (field === "理解程度")
+    return {
+      type: "select",
+      options: ["待练习", "理解大意", "大部分听懂", "能够复述"],
+    };
+  if (["材料链接", "录音链接"].includes(field)) return { type: "url" };
+  return { type: "text" };
+}
+
+export function validateFieldConfig(value: unknown): value is FieldConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.entries(value).every(([name, raw]) => {
+    if (!name.trim() || !raw || typeof raw !== "object" || Array.isArray(raw))
+      return false;
+    const def = raw as FieldDefinition;
+    if (!["text", "number", "select", "url"].includes(def.type)) return false;
+    if (def.type === "select")
+      return (
+        Array.isArray(def.options) &&
+        def.options.length > 0 &&
+        def.options.length <= 50 &&
+        def.options.every(
+          (option) => typeof option === "string" && !!option.trim(),
+        ) &&
+        new Set(def.options).size === def.options.length
+      );
+    if (def.type === "number")
+      return (
+        [def.min, def.max, def.step].every(
+          (n) =>
+            n === undefined || (typeof n === "number" && Number.isFinite(n)),
+        ) &&
+        (def.min === undefined ||
+          def.max === undefined ||
+          def.min <= def.max) &&
+        (def.step === undefined || def.step > 0) &&
+        (def.unit === undefined || typeof def.unit === "string")
+      );
+    return true;
+  });
+}
+
+export function fieldValueError(
+  def: FieldDefinition,
+  value: string,
+): string | null {
+  if (!value.trim()) return null;
+  if (def.type === "url")
+    return safeUrl(value)
+      ? null
+      : "请填写以 http:// 或 https:// 开头的有效链接。";
+  if (def.type === "select")
+    return def.options?.includes(value) ? null : "请从选项中选择一个值。";
+  if (def.type === "number") {
+    const number = Number(value);
+    if (
+      !/^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(value) ||
+      !Number.isFinite(number)
+    )
+      return "请填写有效数字。";
+    if (def.min !== undefined && number < def.min)
+      return `不能小于 ${def.min}。`;
+    if (def.max !== undefined && number > def.max)
+      return `不能大于 ${def.max}。`;
+    if (def.step !== undefined) {
+      const steps = (number - (def.min || 0)) / def.step;
+      if (Math.abs(steps - Math.round(steps)) > 1e-8)
+        return def.step === 1
+          ? "请填写整数。"
+          : `请按 ${def.step} 的步长填写。`;
+    }
+  }
+  return null;
+}
+
+/** Unchanged legacy free text is retained; new edits follow the field rules. */
+export function validateCustomFieldValues(
+  module: Module,
+  values: Record<string, string>,
+  original: Record<string, string> = {},
+): string | null {
+  for (const field of module.fields) {
+    const value = values[field] || "";
+    if (value === original[field]) continue;
+    const error = fieldValueError(getFieldDefinition(module, field), value);
+    if (error) return `${field}：${error}`;
+  }
+  return null;
 }
