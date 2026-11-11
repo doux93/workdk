@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "workdk-journal": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": ["C:/Tools/workdk-agent/mcp.mjs"]
+    }
+  }
+}

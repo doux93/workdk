@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bot,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -55,6 +56,7 @@ import ModuleEditor from "./components/ModuleEditor";
 import RecordEditor from "./components/RecordEditor";
 import SearchDialog from "./components/SearchDialog";
 import { FieldValue } from "./components/Fields";
+import AgentJournal, { AgentToday } from "./components/AgentJournal";
 const STORE = "yiyu-workspace-v1";
 export default function App() {
   const [data, setData] = useState<Workspace | null>(null);
@@ -337,7 +339,12 @@ export default function App() {
       : null;
   const pageTitle =
     current?.name ||
-    { home: data.name, templates: "模板中心", settings: "偏好设置" }[route] ||
+    {
+      home: data.name,
+      templates: "模板中心",
+      settings: "偏好设置",
+      agents: "Agent 工作日志",
+    }[route] ||
     "页面未找到";
   const itemLink = (m: Module, e: Entry) =>
     navigate(`modules/${m.id}/items/${e.id}`);
@@ -391,6 +398,13 @@ export default function App() {
           >
             <LayoutTemplate size={19} />
             模板中心<span className="new-tag">NEW</span>
+          </button>
+          <button
+            className={"nav-item " + (route === "agents" ? "active" : "")}
+            onClick={() => navigate("agents")}
+          >
+            <Bot size={19} />
+            Agent 工作日志
           </button>
           <div className="nav-caption">
             <span>我的模块</span>
@@ -613,16 +627,55 @@ export default function App() {
           )}
 
           {route === "home" ? (
-            <HomeDashboard
-              data={data}
-              visible={visible}
+            <>
+              <AgentToday navigate={navigate} />
+              <HomeDashboard
+                data={data}
+                visible={visible}
+                navigate={navigate}
+                openModule={openModule}
+                openRecord={openRecord}
+                setStatus={setStatus}
+                onManageModules={() => setModal("manage")}
+                setCalendarMonth={setCalendarMonth}
+                setSelectedDate={setSelectedDate}
+              />
+            </>
+          ) : route === "agents" ? (
+            <AgentJournal
+              modules={data.modules}
               navigate={navigate}
-              openModule={openModule}
-              openRecord={openRecord}
-              setStatus={setStatus}
-              onManageModules={() => setModal("manage")}
-              setCalendarMonth={setCalendarMonth}
-              setSelectedDate={setSelectedDate}
+              onAddTask={(mid, s) => {
+                const sourceUrl = `${location.origin}/#agents`;
+                const marker = `Agent 来源编号：${s.id}`;
+                changeModule(mid, (m) =>
+                  m.entries.some((e) => e.description.includes(marker))
+                    ? m
+                    : {
+                        ...m,
+                        entries: [
+                          {
+                            ...blankEntry(),
+                            title:
+                              s.title_override ||
+                              s.summary
+                                .split("\n")[0]
+                                .replace(/^#+\s*/, "")
+                                .slice(0, 100) ||
+                              "Agent 工作后续",
+                            description:
+                              (s.summary_override || s.summary) +
+                              "\n\n" +
+                              marker,
+                            url: sourceUrl,
+                            date: dateKey(),
+                            sample: false,
+                          },
+                          ...m.entries,
+                        ],
+                      },
+                );
+              }}
             />
           ) : route === "templates" ? (
             <TemplateCenter

@@ -45,3 +45,12 @@ npm run test:perf -- --write
 组件已按首页、模板中心、模块视图、编辑器、字段、搜索和共享界面拆分。主页面文件从约 3,000 行减少到约 1,200 行；样式仍使用共享主题变量。
 
 当前没有跨设备数据库、无限存储或真实 Windows 的自动化验收。浏览器容量不足时仍需导出备份。新增页面功能后应执行 `npm run check`；视觉变更仍需真实浏览器检查。
+
+## Agent 日志回归（1.4）
+
+- `npm run test:agent`：SQLite 队列、事件适配、API 写入/去重/查询以及独立 Hook 进程测试。
+- `npm run test:ui`：新增 Agent 页面 5 项测试，总计 17 项。
+- `npm run test:perf`：在原有数据压测后执行 `scripts/benchmark-agent.mjs`。
+- `npm run check`：统一运行全部 51 项测试、两组压测和构建。
+
+详细结果与真实设备验证边界见 [AGENT-RELEASE.md](AGENT-RELEASE.md)。

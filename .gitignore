@@ -7,3 +7,8 @@ dist/
 *.log
 .DS_Store
 *.tsbuildinfo
+
+*.sqlite
+*.sqlite-*
+*agent.config.json
+agent-config.json
