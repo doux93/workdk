@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-11",
+  "environment": {
+    "os": "Linux cloud workspace",
+    "node": "v24.22.1",
+    "codex": "0.167.0-alpha.4"
+  },
+  "publishedPackageMatchesSource": true,
+  "packageFilesChecked": 11,
+  "regressionTests": {
+    "data": 17,
+    "agent": 17,
+    "ui": 17,
+    "passed": 51
+  },
+  "processIntegration": {
+    "hookPayloads": "synthetic protocol fixtures; no live model session",
+    "installerMergeBackupAndRepeatInstall": "passed; isolated homedir lookup",
+    "offlineRetainAndRestart": "passed",
+    "backgroundUploaderAndApiRead": "passed",
+    "redactionAndEvidence": "passed",
+    "retryIdempotence": "passed",
+    "invalidCredentialRejected": "passed",
+    "stdioMcpHandshakeToolCallAndUpload": "passed",
+    "sessions": 2,
+    "events": 5,
+    "pending": 0
+  },
+  "realCodexSession": {
+    "status": "blocked",
+    "stage": "CLI in-process app-server initialization",
+    "error": "Read-only file system (os error 30)",
+    "attemptedWritableStateAndLogDirectories": true,
+    "modelTaskStarted": false
+  },
+  "claudeAndWorkBuddyDesktop": {
+    "status": "not tested",
+    "reason": "No authenticated desktop/CLI installation in this cloud workspace"
+  },
+  "productionWritesThisRun": false
+}

@@ -54,3 +54,9 @@ npm run test:perf -- --write
 - `npm run check`：统一运行全部 51 项测试、两组压测和构建。
 
 详细结果与真实设备验证边界见 [AGENT-RELEASE.md](AGENT-RELEASE.md)。
+
+## 云电脑多进程验收
+
+`npm run test:integration` 启动独立采集器、SQLite 队列、HTTP 接收服务及 MCP 进程，检查安装配置合并、断网补传、幂等写入、鉴权及 MCP 协议。此检查已加入 `npm run check`。Hook 载荷为模拟数据，不能代替真实 Agent 会话验收。
+
+下载包和云电脑实测范围见 [CLOUD-AGENT-QA.md](CLOUD-AGENT-QA.md)。真实 Codex CLI 在该云环境因主目录只读而未能启动；未将此项标记为通过。

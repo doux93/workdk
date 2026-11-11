@@ -15,11 +15,12 @@
     "test:data": "node --experimental-strip-types --test tests/workspace.test.mjs",
     "test:ui": "vitest run --config vitest.config.ts",
     "test:perf": "node --experimental-strip-types scripts/benchmark.mjs && node scripts/benchmark-agent.mjs",
-    "check": "npm test && npm run test:perf && npm run build",
+    "check": "npm test && npm run test:integration && npm run test:perf && npm run build",
     "test:agent": "node --test tests/agent/*.test.mjs",
     "agent:start": "node agent/collector.mjs run",
     "agent:status": "node agent/collector.mjs status",
-    "agent:server": "node --env-file-if-exists=.env agent/server.mjs"
+    "agent:server": "node --env-file-if-exists=.env agent/server.mjs",
+    "test:integration": "node tests/agent-integration.mjs"
   },
   "dependencies": {
     "lucide-react": "1.31.0",
