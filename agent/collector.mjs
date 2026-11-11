@@ -4,14 +4,13 @@ import {
   mkdirSync,
   existsSync,
   copyFileSync,
+  appendFileSync,
 } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { safeConfig, normalizeEvent } from "./core.mjs";
-import { adaptHook } from "./adapter.mjs";
-import { openQueue, flushQueue } from "./queue.mjs";
+let safeConfig, normalizeEvent;
 const home =
   process.env.WORKDK_AGENT_HOME || path.join(os.homedir(), ".workdk-agent");
 const configPath = path.join(home, "config.json");
@@ -27,10 +26,47 @@ const stdin = async () => {
 function load() {
   return safeConfig(JSON.parse(readFileSync(configPath, "utf8")));
 }
-function queue() {
-  return openQueue(path.join(home, "events.sqlite"));
+async function queue() {
+  const { openQueue } = await import("./queue.mjs");
+  const q = openQueue(path.join(home, "events.sqlite"));
+  try {
+    const { drainHookEvents } = await import("./hook-spool.mjs");
+    drainHookEvents(q, home, logHookError);
+    return q;
+  } catch (error) {
+    q.close();
+    throw error;
+  }
 }
-function installHooks(config, source) {
+function logHookError(error) {
+  try {
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    const name = error?.name || "Error";
+    const detail =
+      name === "SyntaxError"
+        ? "Invalid hook JSON"
+        : String(error?.message || error)
+            .replace(
+              /((?:api[_-]?key|password|secret|token|authorization)\s*[=:]\s*)[^\s,;]+/gi,
+              "$1[redacted]",
+            )
+            .slice(0, 1500);
+    appendFileSync(
+      path.join(home, "hook-error.log"),
+      JSON.stringify({
+        at: new Date().toISOString(),
+        source: process.argv[3] || "",
+        name,
+        code: error?.code || "",
+        message: detail,
+      }) + "\n",
+      { mode: 0o600 },
+    );
+  } catch {
+    /* Logging must never interrupt an Agent. */
+  }
+}
+async function installHooks(config, source) {
   const target = path.join(
     os.homedir(),
     source === "codex" ? ".codex/hooks.json" : ".claude/settings.json",
@@ -39,11 +75,8 @@ function installHooks(config, source) {
   const doc = existsSync(target)
     ? JSON.parse(readFileSync(target, "utf8"))
     : {};
-  const executable = JSON.stringify(process.execPath.replaceAll("\\", "/"));
-  const script = JSON.stringify(
-    fileURLToPath(import.meta.url).replaceAll("\\", "/"),
-  );
-  const run = `${executable} ${script} hook ${source}`;
+  const { hookCommand, mergeHooks } = await import("./hook-launcher.mjs");
+  const run = hookCommand(fileURLToPath(import.meta.url), source);
   doc.hooks ??= {};
   const events =
     source === "codex"
@@ -65,35 +98,36 @@ function installHooks(config, source) {
           "SessionEnd",
         ];
   for (const event of events) {
-    const groups = doc.hooks[event] || [];
-    doc.hooks[event] = groups
-      .map((group) => ({
-        ...group,
-        hooks: (group.hooks || []).filter(
-          (h) =>
-            !String(h.command || "").includes('collector.mjs" hook ' + source),
-        ),
-      }))
-      .filter((g) => g.hooks.length);
-    doc.hooks[event].push({
-      hooks: [
-        {
-          type: "command",
-          command: run,
-          timeout:
-            source === "codex" && ["Interrupt", "SessionEnd"].includes(event)
-              ? 3
-              : 10,
-        },
-      ],
-    });
+    doc.hooks[event] = mergeHooks(
+      doc,
+      event,
+      {
+        type: "command",
+        command: run,
+        timeout:
+          source === "codex" && ["Interrupt", "SessionEnd"].includes(event)
+            ? 3
+            : 10,
+      },
+      source,
+    );
   }
   if (existsSync(target))
     copyFileSync(target, target + ".workdk-backup-" + Date.now());
   writeFileSync(target, JSON.stringify(doc, null, 2) + "\n", { mode: 0o600 });
   console.log(`${source} 回调已配置。请在工具中检查 /hooks 并信任新回调。`);
 }
+if (command === "hook") {
+  process.exitCode = 0;
+  const failOpen = (error) => {
+    logHookError(error);
+    process.exit(0);
+  };
+  process.on("uncaughtException", failOpen);
+  process.on("unhandledRejection", failOpen);
+}
 try {
+  ({ safeConfig, normalizeEvent } = await import("./core.mjs"));
   if (command === "init") {
     const file = process.argv[3];
     if (!file)
@@ -119,22 +153,17 @@ try {
   } else if (command === "install-hooks") {
     const config = load();
     if (!config.projects.length) throw new Error("请先添加至少一个项目");
-    for (const source of ["codex", "claude"]) installHooks(config, source);
+    for (const source of ["codex", "claude"])
+      await installHooks(config, source);
   } else if (command === "hook") {
+    const { adaptHook } = await import("./adapter.mjs");
     const config = load(),
       input = JSON.parse(await stdin()),
       event = adaptHook(process.argv[3], input, config);
     if (event) {
-      const q = queue();
-      try {
-        q.add(event);
-      } finally {
-        q.close();
-      }
+      const { writeHookEvent } = await import("./hook-spool.mjs");
+      writeHookEvent(home, event);
     }
-    // Never block or continue the Agent. Stop requires valid JSON when output is present.
-    if (process.argv[3] === "codex" && input.hook_event_name === "Stop")
-      process.stdout.write("{}");
   } else if (command === "record") {
     const config = load();
     const input = JSON.parse(await stdin());
@@ -146,7 +175,7 @@ try {
     });
     if (!config.projects.some((p) => p.name === event.project))
       throw new Error("项目不在允许列表中");
-    const q = queue();
+    const q = await queue();
     try {
       q.add(event);
     } finally {
@@ -155,14 +184,17 @@ try {
     console.log("记录已进入上传队列");
   } else if (command === "run" || command === "sync") {
     const config = load(),
-      q = queue();
+      q = await queue();
     let stopped = false;
     for (const signal of ["SIGINT", "SIGTERM"])
       process.once(signal, () => {
         stopped = true;
       });
+    const { flushQueue } = await import("./queue.mjs");
+    const { drainHookEvents } = await import("./hook-spool.mjs");
     do {
       try {
+        drainHookEvents(q, home, logHookError);
         const n = await flushQueue(q, config);
         if (n) console.log("已同步 " + n + " 条事件");
       } catch (e) {
@@ -174,9 +206,22 @@ try {
     } while (!stopped);
     q.close();
   } else if (command === "status") {
-    const q = queue();
+    const q = await queue();
     try {
-      console.log(JSON.stringify(q.status(), null, 2));
+      const { outboxCount } = await import("./hook-spool.mjs");
+      console.log(
+        JSON.stringify(
+          {
+            ...q.status(),
+            outboxPending: outboxCount(home),
+            hookErrorLog: existsSync(path.join(home, "hook-error.log"))
+              ? path.join(home, "hook-error.log")
+              : null,
+          },
+          null,
+          2,
+        ),
+      );
     } finally {
       q.close();
     }
@@ -185,11 +230,14 @@ try {
       "支持：init / add-project / install-hooks / run / sync / status / record",
     );
 } catch (e) {
-  console.error(
-    "工作台采集器：" +
-      (command === "hook"
-        ? "记录失败，请运行 status 检查本地环境。"
-        : e.message),
-  );
-  if (command !== "hook") process.exitCode = 1;
+  if (command === "hook") logHookError(e);
+  else {
+    console.error("工作台采集器：" + e.message);
+    process.exitCode = 1;
+  }
+} finally {
+  if (command === "hook") {
+    process.exitCode = 0;
+    if (process.argv[3] === "codex") process.stdout.write("{}");
+  }
 }

@@ -12,3 +12,6 @@ dist/
 *.sqlite-*
 *agent.config.json
 agent-config.json
+
+agent/node.exe
+agent/.workdk-node-runtime.json

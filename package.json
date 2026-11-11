@@ -1,6 +1,6 @@
 {
   "name": "workdk",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "private": true,
   "description": "一隅：可自定义模块、模板与主题的个人工作台",
   "type": "module",

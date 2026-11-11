@@ -59,7 +59,7 @@ export async function main() {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     console.log(
-      "工作台采集器安装 · 1.4.1\n先从工作台“Agent 工作日志 → 连接电脑”下载连接配置。路径可以带引号。",
+      "工作台采集器安装 · 1.4.3\n先从工作台“Agent 工作日志 → 连接电脑”下载连接配置。路径可以带引号。",
     );
     const configFile = await rl.question("连接配置文件路径：");
     const projectDir = await rl.question("允许采集的项目目录：");

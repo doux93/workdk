@@ -1,4 +1,4 @@
-# 工作台 Agent 采集器 1.4.1
+# 工作台 Agent 采集器 1.4.3
 
 需要 Node.js 22.13+。无需额外 npm 依赖。采集器只处理明确加入允许列表的项目；不会读取完整历史对话、文件正文或工具命令全文。任务描述、最终回复、工具名称、文件名和可取得的退出码会经过基础脱敏后同步。脱敏不能保证识别所有业务秘密，请只选择允许上传的工作目录。
 
@@ -47,3 +47,17 @@ Hooks 配置位置为 `~/.codex/hooks.json`、`~/.claude/settings.json`。卸载
 ## Windows 安装脚本兼容性修复（1.4.1）
 
 如果旧包出现 `22.13`、`ector.mjs` 不是命令或乱码，请重新下载 1.4.1 采集器并解压到新文件夹。`.cmd` 现为纯 ASCII / CRLF 的启动入口，中文提示与参数处理由 `setup.mjs` 执行。PowerShell 中也可直接运行 `node .\setup.mjs`。需要 Node.js 22.13+；在 Windows CMD 上的专用检查为 `npm run test:windows`，GitHub Actions 会对发布 ZIP 中的脚本运行该检查。
+
+
+## Windows hook 启动修复（1.4.3）
+
+旧版命令由两个带引号的路径开头，部分 `cmd /C <整条命令>` 启动方式会在 Node 启动前失败；此时采集器应用日志不会生成。
+
+升级后运行 `node collector.mjs install-hooks` 更新已有回调，再重启上传进程，并在 Agent 中重新检查/信任回调。无需重新初始化连接配置或更改工作项目目录。
+
+- Windows 无空格/命令字符的采集器路径：在原目录创建 `node.exe` 硬链接，跨卷或不支持时退回复制，生成不含引号的命令。复制会实际占用磁盘空间。安装器校验运行时哈希，不覆盖不属于采集器的 `node.exe`。
+- 含空格或 CMD 特殊字符的路径：使用 `workdk-hook.cmd` 包装，外层是 PowerShell UTF-16LE 编码的路径/标准输入桥接，以兼容 `cmd /C` 和按空格拆分后 spawn 的调用方。编码内容仅含文件路径和标准输入转发，没有凭据，也不修改执行策略。源码见 `hook-launcher.mjs`。
+- 重装会迁移带/不带引号、含参数和包装脚本形式的 Workdk 回调；不删除无关的 `collector.mjs` 任务。
+- Hook 运行后异常会尽力写入 `~/.workdk-agent/hook-error.log`（自定义 WORKDK_AGENT_HOME 时位于该目录），以退出码 0 结束。外层进程被杀死、操作系统无法启动程序等情况不属于应用可捕获异常。
+- Hook 不加载 SQLite。事件先通过 fsync 和原子重命名写入本地 `outbox`；状态/上传进程再转入原 SQLite 队列。先提交数据库，再删除文件，重放按事件 ID 去重。坏文件保留为 `.invalid` 并记录日志。
+- 升级后需要重启上传进程，旧上传器不会读取新的 outbox。`status` 额外显示 outboxPending 与 hookErrorLog 路径。

@@ -9,6 +9,7 @@ import { normalizeEvent, redact, safeConfig } from "../../agent/core.mjs";
 import { schemaSql, handleAgentRequest } from "../../agent/service.mjs";
 import { openQueue, flushQueue } from "../../agent/queue.mjs";
 import { adaptHook } from "../../agent/adapter.mjs";
+import { drainHookEvents } from "../../agent/hook-spool.mjs";
 const event = (over = {}) => ({
   id: "e1",
   device: "device",
@@ -393,8 +394,10 @@ test("真实独立 Hook 进程写入后退出，不依赖上传服务存活", ()
     );
     assert.equal(r.status, 0);
     assert.deepEqual(JSON.parse(r.stdout), {});
+    assert.ok(!r.stderr.includes("ExperimentalWarning"));
     const q = openQueue(tmp.file);
     try {
+      drainHookEvents(q, tmp.dir);
       assert.equal(q.status().pending, 1);
     } finally {
       q.close();

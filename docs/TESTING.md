@@ -64,3 +64,7 @@ npm run test:perf -- --write
 ## Windows 安装包回归（1.4.1）
 
 新增 4 项安装器检查，数据/Agent/界面测试合计 55 项。`node tests/windows-install.mjs --node-only` 可验证 Node 安装流程；Windows 上使用 `npm run test:windows`，可通过 `--agent-dir` 指向 ZIP 解压目录。`.github/workflows/windows-agent.yml` 对实际下载包运行 Windows CMD 检查。兼容性修复说明见 [WINDOWS-INSTALL-FIX.md](WINDOWS-INSTALL-FIX.md)。
+
+## Windows hook 启动回归（1.4.3）
+
+Agent 测试增至 28 项，连同 17 项数据及 21 项界面测试共 66 项。Windows CI 现在实际启动生成的 Codex / Claude hook，覆盖两种启动方式和三类目录，并断言事件已落盘。`node:sqlite` 导入被加载器拒绝时，hook 仍须正常记录事件。详见 [WINDOWS-HOOK-FIX.md](WINDOWS-HOOK-FIX.md)。

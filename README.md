@@ -124,3 +124,7 @@ WorkBuddy 第一版提供本地 MCP 的 `record_work` 工具入口，尚未适�
 ### Windows 安装修复 1.4.1
 
 如果旧安装脚本出现乱码或 `ector.mjs` 等“不是命令”错误，请重新下载采集器并解压到新目录。在 PowerShell 中可直接运行 `node .\setup.mjs`。启动脚本现为 ASCII / CRLF，中文安装逻辑由 Node 执行，路径支持中文、空格和外层引号。详见 [修复说明](docs/WINDOWS-INSTALL-FIX.md)。
+
+### Windows hook 启动修复 1.4.3
+
+修复带引号的 Node 路径被 `cmd /C` 拆坏的问题。升级后在采集器目录运行 `node .\collector.mjs install-hooks`，重启上传器，并重新检查 Agent 的回调信任。项目和连接配置无需重新初始化。Hook 先写 outbox，由上传器转入原队列；异常日志位于采集器配置目录的 `hook-error.log`。[详细说明](docs/WINDOWS-HOOK-FIX.md)

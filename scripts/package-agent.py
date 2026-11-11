@@ -5,7 +5,7 @@ root = Path(__file__).resolve().parents[1]
 output = root / 'public/workdk-agent.zip'
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     for source in sorted((root / 'agent').iterdir()):
-        if not source.is_file() or source.suffix not in {'.mjs', '.cmd', '.ps1', '.md', '.json'} or source.name in {'server.mjs', 'service.mjs'}:
+        if source.name.startswith('.') or not source.is_file() or source.suffix not in {'.mjs', '.cmd', '.ps1', '.md', '.json'} or source.name in {'server.mjs', 'service.mjs'}:
             continue
         data = source.read_bytes()
         if source.suffix in {'.cmd', '.ps1'}:

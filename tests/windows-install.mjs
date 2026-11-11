@@ -6,11 +6,16 @@ import {
   readFileSync,
   writeFileSync,
   rmSync,
+  copyFileSync,
+  linkSync,
+  readdirSync,
+  existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { isWorkdkHook } from "../agent/hook-launcher.mjs";
 const nodeOnly = process.argv.includes("--node-only");
 assert.ok(
   nodeOnly || process.platform === "win32",
@@ -128,13 +133,143 @@ try {
   );
   assert.equal(
     hooks.hooks.Stop.flatMap((g) => g.hooks).filter((h) =>
-      h.command.includes("collector.mjs"),
+      isWorkdkHook(h.command),
     ).length,
     1,
   );
   const status = await runBatch("status-agent.cmd");
   assert.equal(status.code, 0, status.stdout + "\n" + status.stderr);
   assert.ok(status.stdout.includes('"pending": 0'));
+  if (!nodeOnly) {
+    const nodeDir = path.join(root, "Node runtime with spaces");
+    mkdirSync(nodeDir);
+    const spacedNode = path.join(nodeDir, "node.exe");
+    try {
+      linkSync(process.execPath, spacedNode);
+    } catch {
+      copyFileSync(process.execPath, spacedNode);
+    }
+    const invoke = (program, args, input, extra = {}) =>
+      new Promise((resolve, reject) => {
+        const child = spawn(program, args, {
+          cwd: project,
+          env: { ...env, ...extra },
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+        });
+        let stdout = "",
+          stderr = "";
+        const timer = setTimeout(() => {
+          child.kill();
+          reject(new Error("Hook startup timed out"));
+        }, 15000);
+        child.stdout.on("data", (c) => (stdout += c));
+        child.stderr.on("data", (c) => (stderr += c));
+        child.once("error", (e) => {
+          clearTimeout(timer);
+          reject(e);
+        });
+        child.once("exit", (code) => {
+          clearTimeout(timer);
+          resolve({ code, stdout, stderr });
+        });
+        child.stdin.end(input);
+      });
+    const readSpool = () => {
+      const dir = path.join(state, "outbox");
+      return existsSync(dir)
+        ? readdirSync(dir)
+            .filter((f) => f.endsWith(".json"))
+            .map((f) => JSON.parse(readFileSync(path.join(dir, f), "utf8")))
+        : [];
+    };
+    for (const folder of [
+      "package-flat",
+      "package with spaces",
+      "package & special",
+    ]) {
+      const target = path.join(root, folder);
+      mkdirSync(target);
+      for (const file of readdirSync(agent)) {
+        if (file.startsWith(".") || file === "node.exe") continue;
+        const src = path.join(agent, file);
+        try {
+          copyFileSync(src, path.join(target, file));
+        } catch (e) {
+          if (e.code !== "EISDIR") throw e;
+        }
+      }
+      // Exercise the installer using a Node executable whose own path contains spaces.
+      for (let i = 0; i < 2; i++) {
+        const installed = await invoke(
+          spacedNode,
+          [path.join(target, "collector.mjs"), "install-hooks"],
+          "",
+        );
+        assert.equal(installed.code, 0, installed.stderr);
+      }
+      for (const source of ["codex", "claude"]) {
+        const file = path.join(
+          home,
+          source === "codex" ? ".codex/hooks.json" : ".claude/settings.json",
+        );
+        const hooks = JSON.parse(readFileSync(file, "utf8"));
+        const own = hooks.hooks.Stop.flatMap((g) => g.hooks).filter((h) =>
+          isWorkdkHook(h.command),
+        );
+        assert.equal(own.length, 1);
+        const command = own[0].command;
+        const payload = JSON.stringify({
+          cwd: project,
+          session_id: "windows-hook",
+          turn_id: folder + "-" + source,
+          hook_event_name: "Stop",
+          last_assistant_message: "Windows 回调中文内容",
+        });
+        for (const mode of ["cmd", "split"]) {
+          const before = readSpool().length;
+          const pieces = command.split(/\s+/);
+          const result = await invoke(
+            mode === "cmd" ? process.env.ComSpec || "cmd.exe" : pieces[0],
+            mode === "cmd" ? ["/C", command] : pieces.slice(1),
+            payload,
+          );
+          assert.equal(
+            result.code,
+            0,
+            folder +
+              " / " +
+              mode +
+              " / " +
+              source +
+              "\n" +
+              result.stdout +
+              "\n" +
+              result.stderr,
+          );
+          assert.ok(!result.stderr.includes("ExperimentalWarning"));
+          assert.equal(
+            readSpool().length,
+            before + 1,
+            folder + " / " + mode + " did not capture event",
+          );
+          assert.ok(
+            readSpool().some((e) => e.summary === "Windows 回调中文内容"),
+          );
+        }
+        const bad = await invoke(
+          process.env.ComSpec || "cmd.exe",
+          ["/C", command],
+          "{",
+        );
+        assert.equal(bad.code, 0);
+        assert.ok(existsSync(path.join(state, "hook-error.log")));
+      }
+    }
+    console.log(
+      "PASS: generated Codex/Claude hooks run with cmd /C and split spawn; flat/space/special directories; runtime path spaces; Unicode stdin; fail-open errors.",
+    );
+  }
   console.log(
     `PASS: ${nodeOnly ? "Node installer entry" : "Windows CMD"} setup and status; quoted Unicode/space paths; repeated install; no duplicate hooks.`,
   );
