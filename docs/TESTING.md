@@ -60,3 +60,7 @@ npm run test:perf -- --write
 `npm run test:integration` 启动独立采集器、SQLite 队列、HTTP 接收服务及 MCP 进程，检查安装配置合并、断网补传、幂等写入、鉴权及 MCP 协议。此检查已加入 `npm run check`。Hook 载荷为模拟数据，不能代替真实 Agent 会话验收。
 
 下载包和云电脑实测范围见 [CLOUD-AGENT-QA.md](CLOUD-AGENT-QA.md)。真实 Codex CLI 在该云环境因主目录只读而未能启动；未将此项标记为通过。
+
+## Windows 安装包回归（1.4.1）
+
+新增 4 项安装器检查，数据/Agent/界面测试合计 55 项。`node tests/windows-install.mjs --node-only` 可验证 Node 安装流程；Windows 上使用 `npm run test:windows`，可通过 `--agent-dir` 指向 ZIP 解压目录。`.github/workflows/windows-agent.yml` 对实际下载包运行 Windows CMD 检查。兼容性修复说明见 [WINDOWS-INSTALL-FIX.md](WINDOWS-INSTALL-FIX.md)。

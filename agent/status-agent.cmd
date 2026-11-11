@@ -1,5 +1,8 @@
 @echo off
+setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
-node collector.mjs status
+node "%~dp0collector.mjs" status
+set "WORKDK_AGENT_EXIT=%errorlevel%"
 pause
+exit /b %WORKDK_AGENT_EXIT%

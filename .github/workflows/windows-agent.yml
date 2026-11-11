@@ -1,0 +1,35 @@
+name: Windows agent installer
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agent/**'
+      - 'public/workdk-agent.zip'
+      - 'tests/windows-install.mjs'
+      - '.github/workflows/windows-agent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact public commit
+        shell: pwsh
+        run: |
+          git init .
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          git fetch --depth=1 origin "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test the packaged installer using Windows CMD
+        shell: pwsh
+        run: |
+          node --version
+          $destination = Join-Path $env:RUNNER_TEMP 'workdk-download-test'
+          Expand-Archive -LiteralPath '.\public\workdk-agent.zip' -DestinationPath $destination -Force
+          $agentDir = Join-Path $destination 'workdk-agent'
+          node tests/windows-install.mjs --agent-dir $agentDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

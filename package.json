@@ -1,6 +1,6 @@
 {
   "name": "workdk",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "一隅：可自定义模块、模板与主题的个人工作台",
   "type": "module",
@@ -20,7 +20,9 @@
     "agent:start": "node agent/collector.mjs run",
     "agent:status": "node agent/collector.mjs status",
     "agent:server": "node --env-file-if-exists=.env agent/server.mjs",
-    "test:integration": "node tests/agent-integration.mjs"
+    "test:integration": "node tests/agent-integration.mjs",
+    "test:windows": "node tests/windows-install.mjs",
+    "package:agent": "python scripts/package-agent.py"
   },
   "dependencies": {
     "lucide-react": "1.31.0",

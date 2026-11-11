@@ -120,3 +120,7 @@ Hash 路由支持普通静态托管与详情页刷新；改名或换模板不会
 - [第一版验收记录](docs/AGENT-RELEASE.md)
 
 WorkBuddy 第一版提供本地 MCP 的 `record_work` 工具入口，尚未适配原生任务完成回调。真实接入需要你的电脑在线安装，并检查实际工具版本支持的回调。
+
+### Windows 安装修复 1.4.1
+
+如果旧安装脚本出现乱码或 `ector.mjs` 等“不是命令”错误，请重新下载采集器并解压到新目录。在 PowerShell 中可直接运行 `node .\setup.mjs`。启动脚本现为 ASCII / CRLF，中文安装逻辑由 Node 执行，路径支持中文、空格和外层引号。详见 [修复说明](docs/WINDOWS-INSTALL-FIX.md)。
