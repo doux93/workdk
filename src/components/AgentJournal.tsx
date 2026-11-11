@@ -149,6 +149,8 @@ export default function AgentJournal({
     [connection, setConnection] = useState(false),
     [taskModule, setTaskModule] = useState(""),
     [taskMessage, setTaskMessage] = useState("");
+  const [configError, setConfigError] = useState("");
+  const [configBusy, setConfigBusy] = useState(false);
   useEffect(() => {
     if (!editing) return;
     const prevent = (e: BeforeUnloadEvent) => {
@@ -224,12 +226,40 @@ export default function AgentJournal({
     };
   }, [selected?.id]);
   async function downloadConfig() {
+    setConfigError("");
+    setConfigBusy(true);
     try {
-      const r = await fetch("/api/agent-setup", { credentials: "same-origin" });
-      if (!r.ok) throw new Error("请使用工作台所有者账号登录后下载配置。");
+      const r = await fetch("/api/agent-setup", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const isJson = r.headers
+        .get("content-type")
+        ?.includes("application/json");
+      if (!r.ok) {
+        let message = "";
+        if (isJson) {
+          const body = (await r.json()) as { error?: unknown; code?: unknown };
+          if (typeof body.error === "string") message = body.error;
+        }
+        if (!message)
+          message =
+            r.status === 404
+              ? "当前地址没有采集服务；如果使用本机版，请同时启动采集 API 服务。"
+              : r.status === 401
+                ? "下载接口未识别到登录状态，请在新窗口登录后重试。"
+                : r.status === 403
+                  ? "下载请求被拒绝，请在新窗口查看具体原因。"
+                  : r.status >= 500
+                    ? "连接配置服务暂时不可用，请稍后重试。"
+                    : "下载失败，请重试。";
+        throw new Error(`HTTP ${r.status} · ${message}`);
+      }
+      if (!isJson)
+        throw new Error(
+          "下载请求跳转到了登录页面，请点击“在新窗口下载”完成正常登录后重试。",
+        );
       const blob = await r.blob();
-      if (!r.headers.get("content-type")?.includes("application/json"))
-        throw new Error("请先登录工作台。");
       const href = URL.createObjectURL(blob),
         a = document.createElement("a");
       a.href = href;
@@ -237,7 +267,13 @@ export default function AgentJournal({
       a.click();
       setTimeout(() => URL.revokeObjectURL(href), 1000);
     } catch (e) {
-      setError((e as Error).message);
+      setConfigError(
+        e instanceof TypeError
+          ? "下载请求未完成，请点击“在新窗口下载”检查登录状态或连接。"
+          : (e as Error).message,
+      );
+    } finally {
+      setConfigBusy(false);
     }
   }
   async function loadMore() {
@@ -443,10 +479,35 @@ export default function AgentJournal({
                   <a className="button" href="/workdk-agent.zip" download>
                     下载采集器
                   </a>
-                  <button className="button primary" onClick={downloadConfig}>
-                    下载连接配置
+                  <button
+                    className="button primary"
+                    onClick={downloadConfig}
+                    disabled={configBusy}
+                  >
+                    {configBusy ? "正在下载…" : "下载连接配置"}
                   </button>
                 </div>
+                {configError && (
+                  <div>
+                    <p role="alert">{configError}</p>
+                    <a
+                      className="text-button"
+                      href="/api/agent-setup"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      在新窗口下载
+                    </a>
+                    <span> · </span>
+                    <a
+                      className="text-button"
+                      href="/signin-with-chatgpt?return_to=%2F%23agents"
+                      target="_top"
+                    >
+                      重新登录工作台
+                    </a>
+                  </div>
+                )}
               </li>
               <li>
                 <b>解压并运行 setup-agent.cmd</b>

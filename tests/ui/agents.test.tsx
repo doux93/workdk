@@ -160,3 +160,36 @@ it("筛选来源发到服务端，列表分页追加会话", async () => {
     ).toBe(2),
   );
 });
+
+it.each([
+  [401, "下载接口未识别到登录状态"],
+  [403, "当前登录账号与所有者不匹配"],
+  [404, "当前地址没有采集服务"],
+  [503, "连接配置尚未就绪"],
+])(
+  "下载失败 %i 展示实际错误，并提供正常登录/新窗口入口",
+  async (status, message) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        url === "/api/agent-setup"
+          ? response({ error: message }, status)
+          : response({ sessions: [], devices: [], hasMore: false }),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<AgentJournal {...props()} />);
+    await user.click(await screen.findByRole("button", { name: "开始连接" }));
+    await user.click(screen.getByRole("button", { name: "下载连接配置" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      `HTTP ${status} · ${message}`,
+    );
+    expect(screen.getByRole("link", { name: "在新窗口下载" })).toHaveAttribute(
+      "href",
+      "/api/agent-setup",
+    );
+    expect(
+      screen.getByRole("link", { name: "重新登录工作台" }),
+    ).toHaveAttribute("target", "_top");
+  },
+);

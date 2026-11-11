@@ -1,3 +1,4 @@
+import { accessFailure, failureResponse } from "./agent-access-errors.mjs";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../app/chatgpt-auth";
 import { handleAgentRequest } from "../agent/service.mjs";
@@ -38,6 +39,20 @@ export async function agentApi(request: Request) {
   const origin = request.headers.get("origin");
   const sameOrigin = !origin || origin === new URL(request.url).origin;
   const authorized = service || (owner && sameOrigin);
+  const failure = accessFailure({
+    userPresent: !!user,
+    ownerConfigured: !!config.AGENT_OWNER_EMAIL,
+    ownerMatches: owner,
+    sameOrigin,
+    serviceAuthorized: service,
+    credentialSupplied: !!supplied,
+    isSetup: new URL(request.url).pathname === "/api/agent-setup",
+    setupReady: !!(
+      config.AGENT_INGEST_TOKEN && config.AGENT_SERVICE_ACCESS_TOKEN
+    ),
+  });
+  if (failure) return failureResponse(failure);
+
   const adapter = {
     async all(sql: string, args: unknown[]) {
       const result = await config.DB.prepare(sql)
