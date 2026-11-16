@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Bot,
   ArrowDown,
@@ -41,12 +41,9 @@ import {
   statusName,
   dateKey,
   blankEntry,
-  initialWorkspace,
   validateWorkspace,
   safeUrl,
-  loadWorkspace,
   removeExampleEntries,
-  persistWorkspace,
 } from "./workspace";
 import { Icon, Empty, Modal } from "./components/shared";
 import HomeDashboard from "./components/HomeDashboard";
@@ -57,9 +54,20 @@ import RecordEditor from "./components/RecordEditor";
 import SearchDialog from "./components/SearchDialog";
 import { FieldValue } from "./components/Fields";
 import AgentJournal, { AgentToday } from "./components/AgentJournal";
-const STORE = "yiyu-workspace-v1";
+import { useWorkspaceStorage } from "./hooks/useWorkspaceStorage";
 export default function App() {
-  const [data, setData] = useState<Workspace | null>(null);
+  const {
+    data,
+    setData,
+    recoveryRaw,
+    saveError,
+    storageConflict,
+    saveState,
+    reload,
+    restore,
+    retry,
+    replaceUnreadable,
+  } = useWorkspaceStorage();
   const [route, setRoute] = useState("home");
   const [toast, setToast] = useState("");
   const [sidebar, setSidebar] = useState(false);
@@ -67,21 +75,10 @@ export default function App() {
     "module" | "record" | "search" | "manage" | "confirm" | null
   >(null);
   const [narrow, setNarrow] = useState(false);
-  const [recoveryRaw, setRecoveryRaw] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState("");
   const [editModule, setEditModule] = useState<Module | null>(null);
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
   const [entryModule, setEntryModule] = useState("tasks");
   const [query, setQuery] = useState("");
-  const [storageConflict, setStorageConflict] = useState<{
-    raw: string | null;
-  } | null>(null);
-  const expectedRaw = useRef<string | null>(null);
-  const [lastSavedRaw, setLastSavedRaw] = useState<string | null>(null);
-  const serializedData = useMemo(
-    () => (data ? JSON.stringify(data) : null),
-    [data],
-  );
   const [filter, setFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(dateKey());
@@ -96,18 +93,6 @@ export default function App() {
     action: () => void;
   } | null>(null);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORE);
-      expectedRaw.current = raw;
-      const loaded = loadWorkspace(raw);
-      setData(loaded.workspace);
-      setRecoveryRaw(loaded.recoveryRaw);
-    } catch {
-      setData(initialWorkspace());
-      setSaveError(
-        "浏览器存储不可用，当前更改仅保留在本次页面中。请导出备份。",
-      );
-    }
     const onHash = () => {
       let hash = location.hash.slice(1);
       try {
@@ -125,43 +110,8 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   useEffect(() => {
-    if (!data) return;
-    document.documentElement.dataset.theme = data.theme;
-    if (recoveryRaw !== null || storageConflict !== null) return;
-    const result = persistWorkspace(
-      {
-        getItem: (key) => window.localStorage.getItem(key),
-        setItem: (key, value) => window.localStorage.setItem(key, value),
-      },
-      STORE,
-      data,
-      expectedRaw.current,
-    );
-    if (result.status === "saved") {
-      expectedRaw.current = result.raw;
-      setLastSavedRaw(result.raw);
-      setSaveError("");
-    } else if (result.status === "conflict") {
-      setStorageConflict({ raw: result.raw });
-    } else {
-      setSaveError(
-        "自动保存失败，当前更改尚未保存。请导出备份并检查浏览器存储空间。",
-      );
-    }
-  }, [data, recoveryRaw, storageConflict]);
-  useEffect(() => {
-    const handle = (event: StorageEvent) => {
-      if (
-        event.storageArea === localStorage &&
-        (event.key === STORE || event.key === null) &&
-        event.newValue !== expectedRaw.current
-      ) {
-        setStorageConflict({ raw: event.newValue });
-      }
-    };
-    window.addEventListener("storage", handle);
-    return () => window.removeEventListener("storage", handle);
-  }, []);
+    if (data) document.documentElement.dataset.theme = data.theme;
+  }, [data?.theme]);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 760px)");
     const sync = () => setNarrow(media.matches);
@@ -280,15 +230,7 @@ export default function App() {
         "恢复工作台备份？",
         `将用备份中的 ${value.modules.length} 个模块替换当前工作台。建议先导出当前数据。`,
         () => {
-          try {
-            expectedRaw.current = localStorage.getItem(STORE);
-          } catch {
-            expectedRaw.current = null;
-          }
-          setStorageConflict(null);
-          setRecoveryRaw(null);
-          setSaveError("");
-          setData(value);
+          restore(value);
           navigate("home");
           notify("备份已恢复。");
         },
@@ -300,26 +242,11 @@ export default function App() {
     }
   };
   const loadLatest = () => {
-    try {
-      const raw = localStorage.getItem(STORE),
-        loaded = loadWorkspace(raw);
-      expectedRaw.current = raw;
-      setStorageConflict(null);
-      setRecoveryRaw(loaded.recoveryRaw);
-      setSaveError("");
-      setData(loaded.workspace);
+    if (reload()) {
       navigate("home");
       notify("已载入浏览器中的最新内容。");
-    } catch {
-      setSaveError("暂时无法读取浏览器数据，请先导出当前内容。");
     }
   };
-  const saveState =
-    recoveryRaw !== null || storageConflict !== null || saveError
-      ? "未保存"
-      : serializedData === lastSavedRaw
-        ? "已保存"
-        : "保存中";
   if (!data)
     return (
       <div className="loading">
@@ -607,7 +534,7 @@ export default function App() {
                           "使用当前工作台替换旧数据？",
                           "此操作会覆盖浏览器中无法读取的旧数据。请确认已经下载原始数据以便恢复。",
                           () => {
-                            setRecoveryRaw(null);
+                            replaceUnreadable();
                             notify("已启用当前工作台的自动保存。");
                           },
                         )
@@ -617,10 +544,16 @@ export default function App() {
                     </button>
                   </>
                 ) : (
-                  <button className="button" onClick={exportData}>
-                    <Download size={15} />
-                    导出备份
-                  </button>
+                  <>
+                    <button className="button primary" onClick={retry}>
+                      <RotateCcw size={15} />
+                      重试保存
+                    </button>
+                    <button className="button" onClick={exportData}>
+                      <Download size={15} />
+                      导出备份
+                    </button>
+                  </>
                 )}
               </div>
             </section>

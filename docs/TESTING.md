@@ -1,4 +1,4 @@
-# 测试与性能说明（1.3.0）
+# 测试与性能说明（1.4.4）
 
 ## 一次完成检查
 
@@ -7,7 +7,7 @@ npm ci
 npm run check
 ```
 
-`check` 顺序执行 17 项数据测试、12 项自动界面测试、数据量压测和 TypeScript/生产构建。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:ui`、`npm run test:perf` 和 `npm run build`。
+`check` 顺序执行 17 项数据测试、34 项 Agent 测试、32 项自动界面测试（共 83 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
 
 ## 自动界面测试
 
@@ -44,7 +44,7 @@ npm run test:perf -- --write
 
 组件已按首页、模板中心、模块视图、编辑器、字段、搜索和共享界面拆分。主页面文件从约 3,000 行减少到约 1,200 行；样式仍使用共享主题变量。
 
-当前没有跨设备数据库、无限存储或真实 Windows 的自动化验收。浏览器容量不足时仍需导出备份。新增页面功能后应执行 `npm run check`；视觉变更仍需真实浏览器检查。
+工作台内容保存在当前浏览器，Agent 日志通过独立服务保存；工作台内容不会自动跨设备同步。浏览器容量不足时可以导出备份，释放空间后点击「重试保存」。现有 CI 包含真实 Windows 安装和 hook 验证；真实 Agent 账号与云端托管环境仍需单独验收。新增页面功能后应执行 `npm run check`；视觉和原生交互变更还需执行浏览器检查。
 
 ## Agent 日志回归（1.4）
 
@@ -68,3 +68,14 @@ npm run test:perf -- --write
 ## Windows hook 启动回归（1.4.3）
 
 Agent 测试增至 28 项，连同 17 项数据及 21 项界面测试共 66 项。Windows CI 现在实际启动生成的 Codex / Claude hook，覆盖两种启动方式和三类目录，并断言事件已落盘。`node:sqlite` 导入被加载器拒绝时，hook 仍须正常记录事件。详见 [WINDOWS-HOOK-FIX.md](WINDOWS-HOOK-FIX.md)。
+
+
+## 保存恢复与真实浏览器回归（1.4.4）
+
+- `useWorkspaceStorage` 统一管理存储状态；新增 4 项组件测试验证保存失败重试、离开保护、重试前跨窗口更新、损坏备份保留以及存储权限拒绝后的恢复。
+- 共享弹窗测试验证留白和拖出不会误关闭；连接配置测试验证关闭后终止请求，即使响应迟到也不触发凭据下载。
+- `npm run test:browser` 执行 8 项真实 Chromium 检查：三套主题 × 桌面/窄屏（6 项），加上浏览器原生离开提示与保存重试（1 项）、真实双标签页冲突与确认载入（1 项）。
+- 首次运行先执行 `npx playwright install chromium`。浏览器用例仅使用合成工作台和模拟 Agent API，不读取真实凭据。
+- PR 和 main 的 CI 在 Node 22.13 / 24 上执行完整检查，浏览器任务保存截图、HTML 报告和失败 trace 14 天。窗口背景点击、Escape、关闭后焦点恢复在真实浏览器验证；未进行屏幕阅读器人工验收。
+
+上面的版本分节保留各历史版本当时的测试数量；以本文开头和当前测试运行结果为准。

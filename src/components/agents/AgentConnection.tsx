@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { downloadFile } from "../../agent/download";
 import { Modal } from "../shared";
 import type { AgentDevice } from "../../agent/model";
@@ -12,13 +12,19 @@ export default function AgentConnection({
 }) {
   const [configError, setConfigError] = useState("");
   const [configBusy, setConfigBusy] = useState(false);
+  const active = useRef<AbortController | null>(null);
+  useEffect(() => () => active.current?.abort(), []);
   async function downloadConfig() {
+    if (active.current) return;
+    const controller = new AbortController();
+    active.current = controller;
     setConfigError("");
     setConfigBusy(true);
     try {
       const r = await fetch("/api/agent-setup", {
         credentials: "same-origin",
         cache: "no-store",
+        signal: controller.signal,
       });
       const isJson = r.headers
         .get("content-type")
@@ -46,15 +52,19 @@ export default function AgentConnection({
         throw new Error(
           "下载请求跳转到了登录页面，请点击“在新窗口下载”完成正常登录后重试。",
         );
-      downloadFile(await r.blob(), "workdk-agent.config.json");
+      const blob = await r.blob();
+      if (!controller.signal.aborted)
+        downloadFile(blob, "workdk-agent.config.json");
     } catch (e) {
-      setConfigError(
-        e instanceof TypeError
-          ? "下载请求未完成，请点击“在新窗口下载”检查登录状态或连接。"
-          : (e as Error).message,
-      );
+      if (!controller.signal.aborted)
+        setConfigError(
+          e instanceof TypeError
+            ? "下载请求未完成，请点击“在新窗口下载”检查登录状态或连接。"
+            : (e as Error).message,
+        );
     } finally {
-      setConfigBusy(false);
+      if (active.current === controller) active.current = null;
+      if (!controller.signal.aborted) setConfigBusy(false);
     }
   }
   return (

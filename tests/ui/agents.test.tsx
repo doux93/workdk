@@ -378,3 +378,40 @@ it("关闭详情再打开其他会话，不显示迟到的上一会话来源", a
   );
   expect(screen.queryByText("旧的来源依据")).not.toBeInTheDocument();
 });
+
+it("关闭连接弹窗取消下载，迟到的响应不会下载凭据；重新打开仍可重试", async () => {
+  let complete!: (response: Response) => void;
+  let signal!: AbortSignal;
+  const createUrl = vi.fn(() => "blob:test");
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = createUrl;
+    },
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/agent-setup") {
+        signal = options!.signal as AbortSignal;
+        return new Promise<Response>((resolve) => {
+          complete = resolve;
+        });
+      }
+      return response({ sessions: [], devices: [], hasMore: false });
+    }),
+  );
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await user.click(await screen.findByRole("button", { name: "开始连接" }));
+  await user.click(screen.getByRole("button", { name: "下载连接配置" }));
+  expect(screen.getByRole("button", { name: "正在下载…" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "关闭弹窗" }));
+  expect(signal.aborted).toBe(true);
+  await act(async () =>
+    complete(await response({ token: "synthetic-fixture" })),
+  );
+  expect(createUrl).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "开始连接" }));
+  expect(screen.getByRole("button", { name: "下载连接配置" })).toBeEnabled();
+});
