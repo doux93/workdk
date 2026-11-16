@@ -1,6 +1,6 @@
 {
   "name": "workdk",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "description": "一隅：可自定义模块、模板与主题的个人工作台",
   "type": "module",
@@ -15,14 +15,16 @@
     "test:data": "node --experimental-strip-types --test tests/workspace.test.mjs",
     "test:ui": "vitest run --config vitest.config.ts",
     "test:perf": "node --experimental-strip-types scripts/benchmark.mjs && node scripts/benchmark-agent.mjs",
-    "check": "npm test && npm run test:integration && npm run test:perf && npm run build",
+    "check": "npm test && npm run test:integration && npm run test:perf && npm run build && npm run check:package",
     "test:agent": "node --test tests/agent/*.test.mjs",
     "agent:start": "node agent/collector.mjs run",
     "agent:status": "node agent/collector.mjs status",
     "agent:server": "node --env-file-if-exists=.env agent/server.mjs",
     "test:integration": "node tests/agent-integration.mjs",
     "test:windows": "node tests/windows-install.mjs",
-    "package:agent": "python scripts/package-agent.py"
+    "package:agent": "python scripts/package-agent.py",
+    "check:package": "python scripts/package-agent.py --check",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "lucide-react": "1.31.0",
@@ -30,6 +32,7 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.9",
@@ -38,7 +41,7 @@
     "@vitejs/plugin-react": "6.0.2",
     "jsdom": "26.1.0",
     "typescript": "5.9.3",
-    "vite": "8.0.13",
+    "vite": "8.3.8",
     "vitest": "5.1.0"
   }
 }

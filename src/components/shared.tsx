@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useId, useRef } from "react";
 import {
   Bookmark,
   CalendarDays,
@@ -112,35 +112,65 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const headingId = useId();
+  const subtitleId = useId();
+  const backdropPress = useRef(false);
+  const outside = (x: number, y: number) => {
+    const bounds = ref.current?.getBoundingClientRect();
+    return (
+      !!bounds &&
+      (x < bounds.left ||
+        x > bounds.right ||
+        y < bounds.top ||
+        y > bounds.bottom)
+    );
+  };
   useEffect(() => {
     const prev = document.activeElement as HTMLElement;
-    ref.current?.showModal();
-    ref.current
+    const dialog = ref.current;
+    dialog?.showModal();
+    dialog
       ?.querySelector<HTMLInputElement>(
         'input:not([type="checkbox"]):not([type="hidden"]),textarea',
       )
       ?.focus();
     return () => {
+      dialog?.close();
       if (prev?.isConnected) prev.focus();
     };
   }, []);
   return (
     <dialog
-      aria-label={title}
+      aria-labelledby={headingId}
+      aria-describedby={subtitle ? subtitleId : undefined}
       ref={ref}
       className={"dialog " + (wide ? "wide" : "")}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
+      onPointerDown={(e) => {
+        backdropPress.current =
+          e.button === 0 &&
+          e.target === ref.current &&
+          outside(e.clientX, e.clientY);
+      }}
+      onPointerCancel={() => {
+        backdropPress.current = false;
+      }}
       onClick={(e) => {
-        if (e.target === ref.current) onClose();
+        const dismiss =
+          backdropPress.current &&
+          e.target === ref.current &&
+          outside(e.clientX, e.clientY);
+        backdropPress.current = false;
+        if (dismiss) onClose();
       }}
     >
       <div className="modal-heading">
         <div>
-          <h2>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
+          <h2 id={headingId}>{title}</h2>
+          {subtitle && <p id={subtitleId}>{subtitle}</p>}
         </div>
         <button className="icon-button" aria-label="关闭弹窗" onClick={onClose}>
           <X size={20} />

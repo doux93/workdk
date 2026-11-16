@@ -1,6 +1,6 @@
 import React from "react";
 import { it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgentJournal from "../../src/components/AgentJournal";
 import { initialWorkspace } from "../../src/workspace";
@@ -193,3 +193,225 @@ it.each([
     ).toHaveAttribute("target", "_top");
   },
 );
+
+it("切换来源后忽略仍在返回的旧分页，不把旧记录混入新列表", async () => {
+  let completeOldPage!: (value: Response) => void;
+  const fetcher = vi.fn((url: string) => {
+    if (url.includes("offset="))
+      return new Promise<Response>((resolve) => {
+        completeOldPage = resolve;
+      });
+    return response({
+      sessions: [
+        {
+          ...session,
+          id: url.includes("source=claude") ? "new" : "old",
+          summary: url.includes("source=claude") ? "新来源记录" : "原来源记录",
+        },
+      ],
+      devices: [],
+      hasMore: !url.includes("source=claude"),
+    });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await user.click(await screen.findByRole("button", { name: "加载更多会话" }));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "来源" }),
+    "claude",
+  );
+  await screen.findByRole("heading", { name: "新来源记录" });
+  await act(async () =>
+    completeOldPage(
+      new Response(
+        JSON.stringify({
+          sessions: [{ ...session, id: "late", summary: "迟到的旧记录" }],
+          devices: [],
+          hasMore: false,
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "导出当前记录" })).toBeEnabled(),
+  );
+  expect(
+    screen.queryByRole("heading", { name: "迟到的旧记录" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "原来源记录" }),
+  ).not.toBeInTheDocument();
+});
+
+it("分页去重后仍按服务端返回条数推进 offset", async () => {
+  const fetcher = vi.fn((url: string) => {
+    const offset = new URL(url, "http://localhost").searchParams.get("offset");
+    const ids =
+      offset === "4" ? ["d"] : offset === "2" ? ["b", "c"] : ["a", "b"];
+    return response({
+      sessions: ids.map((id) => ({ ...session, id, summary: `会话 ${id}` })),
+      devices: [],
+      hasMore: offset !== "4",
+    });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await user.click(await screen.findByRole("button", { name: "加载更多会话" }));
+  await screen.findByRole("heading", { name: "会话 c" });
+  expect(screen.getAllByRole("heading", { name: "会话 b" })).toHaveLength(1);
+  await user.click(screen.getByRole("button", { name: "加载更多会话" }));
+  await screen.findByRole("heading", { name: "会话 d" });
+  expect(fetcher.mock.calls.at(-1)?.[0]).toContain("offset=4");
+});
+
+it("刷新失败保留已读取内容并禁用导出，重试成功后恢复", async () => {
+  let fail = false;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      fail
+        ? response({}, 503)
+        : response({ sessions: [session], devices: [], hasMore: false }),
+    ),
+  );
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await screen.findByRole("heading", { name: "修复保存逻辑" });
+  fail = true;
+  await user.click(screen.getByRole("button", { name: "刷新", exact: true }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("保留上次读取");
+  expect(
+    screen.getByRole("heading", { name: "修复保存逻辑" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "导出当前记录" })).toBeDisabled();
+  fail = false;
+  await user.click(screen.getByRole("button", { name: "重试", exact: true }));
+  await waitFor(() =>
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+  );
+  expect(screen.getByRole("button", { name: "导出当前记录" })).toBeEnabled();
+});
+
+it("项目输入在提交后才筛选；无匹配结果提供查看全部记录入口", async () => {
+  const fetcher = vi.fn(() =>
+    response({ sessions: [], devices: [], hasMore: false }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await screen.findByRole("button", { name: "开始连接" });
+  await user.type(screen.getByRole("textbox", { name: "项目" }), "workdk");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("button", { name: "筛选", exact: true }));
+  await waitFor(() =>
+    expect(fetcher.mock.calls.at(-1)?.[0]).toContain("project=workdk"),
+  );
+  await user.click(await screen.findByRole("button", { name: "查看全部记录" }));
+  await waitFor(() =>
+    expect(fetcher.mock.calls.at(-1)?.[0]).toContain("day=&source=&project="),
+  );
+});
+
+it("关闭详情再打开其他会话，不显示迟到的上一会话来源", async () => {
+  let completeOldDetail!: (value: Response) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string) => {
+      if (url.startsWith("/api/agent-session?")) {
+        if (url.includes("id=old"))
+          return new Promise<Response>((resolve) => {
+            completeOldDetail = resolve;
+          });
+        return response({
+          events: [
+            {
+              id: "new-event",
+              kind: "stop",
+              at: session.updated,
+              summary: "新的来源依据",
+              evidence: "",
+            },
+          ],
+          next: null,
+        });
+      }
+      return response({
+        sessions: [
+          { ...session, id: "old", summary: "旧会话" },
+          { ...session, id: "new", summary: "新会话" },
+        ],
+        devices: [],
+        hasMore: false,
+      });
+    }),
+  );
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await user.click(await screen.findByRole("button", { name: /旧会话/ }));
+  await user.click(screen.getByRole("button", { name: "关闭弹窗" }));
+  await user.click(screen.getByRole("button", { name: /新会话/ }));
+  await screen.findByText("新的来源依据");
+  await act(async () =>
+    completeOldDetail(
+      new Response(
+        JSON.stringify({
+          events: [
+            {
+              id: "old-event",
+              kind: "stop",
+              at: session.updated,
+              summary: "旧的来源依据",
+              evidence: "",
+            },
+          ],
+          next: null,
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("dialog")).toHaveTextContent("新的来源依据"),
+  );
+  expect(screen.queryByText("旧的来源依据")).not.toBeInTheDocument();
+});
+
+it("关闭连接弹窗取消下载，迟到的响应不会下载凭据；重新打开仍可重试", async () => {
+  let complete!: (response: Response) => void;
+  let signal!: AbortSignal;
+  const createUrl = vi.fn(() => "blob:test");
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = createUrl;
+    },
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/agent-setup") {
+        signal = options!.signal as AbortSignal;
+        return new Promise<Response>((resolve) => {
+          complete = resolve;
+        });
+      }
+      return response({ sessions: [], devices: [], hasMore: false });
+    }),
+  );
+  const user = userEvent.setup();
+  render(<AgentJournal {...props()} />);
+  await user.click(await screen.findByRole("button", { name: "开始连接" }));
+  await user.click(screen.getByRole("button", { name: "下载连接配置" }));
+  expect(screen.getByRole("button", { name: "正在下载…" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "关闭弹窗" }));
+  expect(signal.aborted).toBe(true);
+  await act(async () =>
+    complete(await response({ token: "synthetic-fixture" })),
+  );
+  expect(createUrl).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "开始连接" }));
+  expect(screen.getByRole("button", { name: "下载连接配置" })).toBeEnabled();
+});
