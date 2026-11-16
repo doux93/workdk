@@ -46,6 +46,9 @@ import {
   removeExampleEntries,
 } from "./workspace";
 import { Icon, Empty, Modal } from "./components/shared";
+import QuickCapture from "./components/QuickCapture";
+import { captureRecord } from "./workflow";
+import { addAgentTask, agentSessionPath, linkedSessionId } from "./agent/links";
 import HomeDashboard from "./components/HomeDashboard";
 import TemplateCenter from "./components/TemplateCenter";
 import ModuleContent from "./components/ModuleContent";
@@ -72,7 +75,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [sidebar, setSidebar] = useState(false);
   const [modal, setModal] = useState<
-    "module" | "record" | "search" | "manage" | "confirm" | null
+    "module" | "record" | "capture" | "search" | "manage" | "confirm" | null
   >(null);
   const [narrow, setNarrow] = useState(false);
   const [editModule, setEditModule] = useState<Module | null>(null);
@@ -96,7 +99,12 @@ export default function App() {
     const onHash = () => {
       let hash = location.hash.slice(1);
       try {
-        hash = decodeURIComponent(hash);
+        const separator = hash.indexOf("?");
+        hash =
+          separator < 0
+            ? decodeURIComponent(hash)
+            : decodeURIComponent(hash.slice(0, separator)) +
+              hash.slice(separator);
       } catch {
         hash = "not-found";
       }
@@ -215,7 +223,7 @@ export default function App() {
     a.download = `一隅工作台-${dateKey()}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    notify("备份已导出，包含模块、模板设置和全部记录。");
+    notify("备份已导出，包含本机模块与记录；Agent 日志需单独导出。");
   };
   const importData = async (file?: File) => {
     if (!file) return;
@@ -257,7 +265,11 @@ export default function App() {
       </div>
     );
   const visible = data.modules.filter((m) => !m.hidden);
-  const parts = route.split("/");
+  const routePath = route.split("?")[0];
+  const routeQuery = new URLSearchParams(
+    route.includes("?") ? route.slice(route.indexOf("?") + 1) : "",
+  );
+  const parts = routePath.split("/");
   const current =
     parts[0] === "modules" ? data.modules.find((m) => m.id === parts[1]) : null;
   const detail =
@@ -271,7 +283,7 @@ export default function App() {
       templates: "模板中心",
       settings: "偏好设置",
       agents: "Agent 工作日志",
-    }[route] ||
+    }[routePath] ||
     "页面未找到";
   const itemLink = (m: Module, e: Entry) =>
     navigate(`modules/${m.id}/items/${e.id}`);
@@ -312,7 +324,7 @@ export default function App() {
         </div>
         <nav>
           <button
-            className={"nav-item " + (route === "home" ? "active" : "")}
+            className={"nav-item " + (routePath === "home" ? "active" : "")}
             onClick={() => navigate("home")}
           >
             <LayoutDashboard size={19} />
@@ -320,14 +332,16 @@ export default function App() {
             <span className="nav-active-dot" />
           </button>
           <button
-            className={"nav-item " + (route === "templates" ? "active" : "")}
+            className={
+              "nav-item " + (routePath === "templates" ? "active" : "")
+            }
             onClick={() => navigate("templates")}
           >
             <LayoutTemplate size={19} />
             模板中心<span className="new-tag">NEW</span>
           </button>
           <button
-            className={"nav-item " + (route === "agents" ? "active" : "")}
+            className={"nav-item " + (routePath === "agents" ? "active" : "")}
             onClick={() => navigate("agents")}
           >
             <Bot size={19} />
@@ -404,7 +418,7 @@ export default function App() {
             <p>让注意力，回到眼前</p>
           </div>
           <button
-            className={"nav-item " + (route === "settings" ? "active" : "")}
+            className={"nav-item " + (routePath === "settings" ? "active" : "")}
             onClick={() => navigate("settings")}
           >
             <Settings2 size={18} />
@@ -442,6 +456,14 @@ export default function App() {
             <b>{pageTitle}</b>
           </div>
           <div className="topbar-actions">
+            <button
+              className="button topbar-capture"
+              aria-label="打开快速记录"
+              onClick={() => setModal("capture")}
+            >
+              <Plus size={17} />
+              <span>快速记录</span>
+            </button>
             <button
               aria-label="搜索工作空间"
               className="search-trigger"
@@ -559,12 +581,13 @@ export default function App() {
             </section>
           )}
 
-          {route === "home" ? (
+          {routePath === "home" ? (
             <>
-              <AgentToday navigate={navigate} />
               <HomeDashboard
                 data={data}
                 visible={visible}
+                onQuickCapture={() => setModal("capture")}
+                agentSummary={<AgentToday navigate={navigate} />}
                 navigate={navigate}
                 openModule={openModule}
                 openRecord={openRecord}
@@ -574,43 +597,16 @@ export default function App() {
                 setSelectedDate={setSelectedDate}
               />
             </>
-          ) : route === "agents" ? (
+          ) : routePath === "agents" ? (
             <AgentJournal
               modules={data.modules}
               navigate={navigate}
-              onAddTask={(mid, s) => {
-                const sourceUrl = `${location.origin}/#agents`;
-                const marker = `Agent 来源编号：${s.id}`;
-                changeModule(mid, (m) =>
-                  m.entries.some((e) => e.description.includes(marker))
-                    ? m
-                    : {
-                        ...m,
-                        entries: [
-                          {
-                            ...blankEntry(),
-                            title:
-                              s.title_override ||
-                              s.summary
-                                .split("\n")[0]
-                                .replace(/^#+\s*/, "")
-                                .slice(0, 100) ||
-                              "Agent 工作后续",
-                            description:
-                              (s.summary_override || s.summary) +
-                              "\n\n" +
-                              marker,
-                            url: sourceUrl,
-                            date: dateKey(),
-                            sample: false,
-                          },
-                          ...m.entries,
-                        ],
-                      },
-                );
+              sessionId={routeQuery.get("session") || ""}
+              onAddTask={(mid, session) => {
+                setData(addAgentTask(data, mid, session));
               }}
             />
-          ) : route === "templates" ? (
+          ) : routePath === "templates" ? (
             <TemplateCenter
               data={data}
               navigate={navigate}
@@ -623,7 +619,7 @@ export default function App() {
                 setModal("module");
               }}
             />
-          ) : route === "settings" ? (
+          ) : routePath === "settings" ? (
             <>
               <div className="page-heading">
                 <div>
@@ -702,7 +698,8 @@ export default function App() {
                 <section className="panel setting-panel">
                   <h2>数据与备份</h2>
                   <p>
-                    内容自动保存在当前浏览器，不会跨设备同步。定期导出备份，可以在其他浏览器中恢复。
+                    本机模块与记录自动保存在当前浏览器，不会跨设备同步。备份保留任务关联编号；Agent
+                    来源记录不在此备份中，需在工作日志页单独导出。
                   </p>
                   <div className="backup-summary">
                     <span>
@@ -828,6 +825,23 @@ export default function App() {
                       </span>
                       <span className="priority">{detail.priority}</span>
                     </div>
+                    {linkedSessionId(detail) && (
+                      <div className="record-source">
+                        <div>
+                          <b>关联的 Agent 工作</b>
+                          <p>核对来源和执行依据；待办状态由你决定。</p>
+                        </div>
+                        <button
+                          className="button"
+                          onClick={() =>
+                            navigate(agentSessionPath(linkedSessionId(detail)!))
+                          }
+                        >
+                          <Bot size={16} />
+                          查看来源会话
+                        </button>
+                      </div>
+                    )}
                     {detail.url && (
                       <a
                         className="detail-link"
@@ -1000,6 +1014,18 @@ export default function App() {
         hidden
         onChange={(e) => importData(e.target.files?.[0])}
       />
+      {modal === "capture" && (
+        <QuickCapture
+          modules={data.modules}
+          onClose={() => setModal(null)}
+          onSave={(input) => {
+            const captured = captureRecord(data, input);
+            setData(captured.workspace);
+            setModal(null);
+            notify("已加入工作台，可继续编辑；保存状态见页面提示。");
+          }}
+        />
+      )}
       {modal === "module" && (
         <ModuleEditor
           module={editModule}

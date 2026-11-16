@@ -25,6 +25,7 @@ import {
   type AgentSession,
   type JournalFilters,
 } from "../agent/model";
+import { agentSessionPath } from "../agent/links";
 import AgentConnection from "./agents/AgentConnection";
 import AgentSessionDetail from "./agents/AgentSessionDetail";
 import "./agents/agent-journal.css";
@@ -35,7 +36,9 @@ export default function AgentJournal({
   modules,
   onAddTask,
   navigate,
+  sessionId,
 }: {
+  sessionId?: string;
   modules: Module[];
   onAddTask: (moduleId: string, session: AgentSession) => void;
   navigate: (path: string) => void;
@@ -48,7 +51,10 @@ export default function AgentJournal({
   const [projectDraft, setProjectDraft] = useState("");
   const [selected, setSelected] = useState<AgentSession | null>(null);
   const [connection, setConnection] = useState(false);
-  const journal = useAgentSessions(filters, !!selected || connection);
+  const journal = useAgentSessions(
+    filters,
+    !!selected || !!sessionId || connection,
+  );
   const { sessions, devices, busy, more, error } = journal;
   const change = (patch: Partial<JournalFilters>) =>
     setFilters((old) => ({ ...old, ...patch }));
@@ -295,7 +301,11 @@ export default function AgentJournal({
             <button
               key={s.id}
               className="panel agent-card"
-              onClick={() => setSelected(s)}
+              onClick={() =>
+                sessionId === undefined
+                  ? setSelected(s)
+                  : navigate(agentSessionPath(s.id))
+              }
             >
               <div className="agent-card-meta">
                 <span className={`agent-source ${s.source}`}>
@@ -339,12 +349,15 @@ export default function AgentJournal({
           onClose={() => setConnection(false)}
         />
       )}
-      {selected && (
+      {(sessionId || selected) && (
         <AgentSessionDetail
-          key={selected.id}
-          session={selected}
+          key={sessionId || selected!.id}
+          session={sessionId ? { id: sessionId } : selected!}
           modules={modules}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null);
+            if (sessionId) navigate("agents");
+          }}
           onSaved={journal.refresh}
           onAddTask={onAddTask}
           navigate={navigate}

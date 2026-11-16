@@ -1,4 +1,12 @@
 export type View = "list" | "board" | "calendar" | "notes" | "links";
+export const modulePurposes = {
+  tasks: "待办",
+  notes: "笔记",
+  schedule: "日程",
+  links: "链接",
+  collection: "资料 / 学习",
+} as const;
+export type ModulePurpose = keyof typeof modulePurposes;
 export type Entry = {
   id: string;
   title: string;
@@ -11,6 +19,7 @@ export type Entry = {
   values: Record<string, string>;
   created: string;
   sample?: boolean;
+  agentSessionId?: string;
 };
 export type Module = {
   id: string;
@@ -19,11 +28,26 @@ export type Module = {
   icon: string;
   color: string;
   view: View;
+  purpose?: ModulePurpose;
   fields: string[];
   fieldConfig?: FieldConfig;
   hidden: boolean;
   entries: Entry[];
 };
+/** Legacy built-in identities are stable; an arbitrary list is never a task list. */
+export function modulePurpose(module: Module): ModulePurpose {
+  if (module.purpose) return module.purpose;
+  const builtins: Record<string, ModulePurpose> = {
+    tasks: "tasks",
+    projects: "tasks",
+    notes: "notes",
+    schedule: "schedule",
+    links: "links",
+  };
+  return Object.hasOwn(builtins, module.id)
+    ? builtins[module.id]
+    : "collection";
+}
 export type Workspace = {
   version: 1;
   name: string;
@@ -110,6 +134,7 @@ export function initialWorkspace(): Workspace {
     modules: [
       {
         id: "tasks",
+        purpose: "tasks",
         name: "我的待办",
         description: "把想做的事，变成做完的事",
         icon: "check",
@@ -134,6 +159,7 @@ export function initialWorkspace(): Workspace {
       },
       {
         id: "projects",
+        purpose: "tasks",
         name: "项目空间",
         description: "从想法到落地，每一步都看得见",
         icon: "folder",
@@ -160,6 +186,7 @@ export function initialWorkspace(): Workspace {
       },
       {
         id: "notes",
+        purpose: "notes",
         name: "工作笔记",
         description: "留住每个值得记录的想法",
         icon: "note",
@@ -184,6 +211,7 @@ export function initialWorkspace(): Workspace {
       },
       {
         id: "links",
+        purpose: "links",
         name: "常用链接",
         description: "每天要去的地方，都在这里",
         icon: "link",
@@ -212,6 +240,7 @@ export function initialWorkspace(): Workspace {
       },
       {
         id: "schedule",
+        purpose: "schedule",
         name: "日程安排",
         description: "让重要的时间，各就其位",
         icon: "calendar",
@@ -262,6 +291,9 @@ export function validateWorkspace(x: unknown): x is Workspace {
           typeof m.icon === "string" &&
           colors.includes(m.color) &&
           views.some((v) => v.id === m.view) &&
+          (m.purpose === undefined ||
+            (typeof m.purpose === "string" &&
+              Object.hasOwn(modulePurposes, m.purpose))) &&
           typeof m.hidden === "boolean" &&
           Array.isArray(m.fields) &&
           m.fields.every((f) => typeof f === "string" && f.trim().length > 0) &&
@@ -286,6 +318,10 @@ export function validateWorkspace(x: unknown): x is Workspace {
               typeof e.url === "string" &&
               typeof e.created === "string" &&
               (e.sample === undefined || typeof e.sample === "boolean") &&
+              (e.agentSessionId === undefined ||
+                (typeof e.agentSessionId === "string" &&
+                  e.agentSessionId.trim().length > 0 &&
+                  e.agentSessionId.length <= 5000)) &&
               e.values &&
               typeof e.values === "object" &&
               !Array.isArray(e.values) &&
@@ -522,6 +558,7 @@ export function createModuleFromLearningPreset(presetId: string): Module {
     icon: preset.icon,
     color: preset.color,
     view: preset.view,
+    purpose: "collection",
     fields: [...preset.fields],
     fieldConfig: Object.fromEntries(
       preset.fields.map((field) => [

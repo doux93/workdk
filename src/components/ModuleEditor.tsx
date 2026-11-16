@@ -3,6 +3,9 @@ import React, { useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import {
   type Module,
+  modulePurpose,
+  modulePurposes,
+  type ModulePurpose,
   type View,
   views,
   colors,
@@ -24,6 +27,9 @@ export default function ModuleEditor({
   onClose: () => void;
   onSave: (m: Module) => void;
 }) {
+  const [purpose, setPurpose] = useState<ModulePurpose>(
+    m ? modulePurpose(m) : "collection",
+  );
   const [view, setView] = useState<View>(m?.view || "list");
   const [color, setColor] = useState(m?.color || "green");
   const [icon, setIcon] = useState(m?.icon || "check");
@@ -61,7 +67,8 @@ export default function ModuleEditor({
   const formRef = useRef<HTMLFormElement>(null);
   const requestClose = useDraftGuard(
     formRef,
-    view !== (m?.view || "list") ||
+    purpose !== (m ? modulePurpose(m) : "collection") ||
+      view !== (m?.view || "list") ||
       color !== (m?.color || "green") ||
       icon !== (m?.icon || "check") ||
       !includeSamples ||
@@ -116,6 +123,7 @@ export default function ModuleEditor({
             icon,
             color,
             view,
+            purpose,
             fields,
             fieldConfig: definitions,
             hidden: m?.hidden || false,
@@ -160,6 +168,22 @@ export default function ModuleEditor({
               />
             </label>
           </div>
+          <label>
+            模块用途
+            <select
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value as ModulePurpose)}
+            >
+              {Object.entries(modulePurposes).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">
+              只有待办用途参与首页聚焦；切换页面视图不会改变用途或内容。
+            </span>
+          </label>
           <label className="form-label">选择页面模板</label>
           <div className="view-choice-grid">
             {views.map((v) => (

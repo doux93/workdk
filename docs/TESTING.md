@@ -1,4 +1,4 @@
-# 测试与性能说明（1.5.1）
+# 测试与性能说明（1.6.0）
 
 ## 一次完成检查
 
@@ -7,7 +7,7 @@ npm ci
 npm run check
 ```
 
-`check` 顺序执行 17 项数据测试、51 项 Agent 测试、36 项自动界面测试（共 104 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
+`check` 顺序执行 23 项数据测试、52 项 Agent 测试、43 项自动界面测试（共 118 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
 
 ## 自动界面测试
 
@@ -94,3 +94,9 @@ Agent 测试增至 28 项，连同 17 项数据及 21 项界面测试共 66 项�
 协议适配范围为 stdio 的 2024-11-05、2025-06-18、2025-11-25；其他版本返回 2025-11-25，由客户端判断是否兼容。不声明支持要求批量请求的 2025-03-26 或新的无会话协议。只声明 tools 能力，不实现 HTTP MCP、资源或提示词接口。依据 [MCP 生命周期](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle)、[工具错误处理](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)及 [stdio 传输](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)。
 
 三主题、两种宽度的现有浏览器用例展开并截图 WorkBuddy 指引，检查内容无横向溢出。自动测试不等于真实 WorkBuddy 桌面会话验收，亦不代表已部署云端 D1 迁移。
+
+## 日常工作流程回归（1.6.0）
+
+新增 6 项数据测试覆盖按用途跨模块聚焦、日期分组、示例与隐藏内容排除、旧备份兼容、快速记录校验及任务关联去重。新增 7 项 DOM 测试覆盖一句话记录、随手记分流、未安排事项、草稿保护、用途编辑、特殊字符会话往返、错误处理、午夜更新及旧待办编辑保留关联。新增 1 项 Agent 测试验证按编号读取完整会话、人工修正、原始依据保留、未知编号和未授权拒绝。
+
+新增 7 项 Chromium 测试（总计 16 项）：三主题 × 桌面 / 390px 的首页与快速记录截图、日期分组与刷新持久保存，以及真实页面中的会话 → 待办 → 来源往返、直接刷新与浏览器返回。使用合成记录和 API 响应，不宣称完成真实 Agent 会话或生产部署验收。

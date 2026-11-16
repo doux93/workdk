@@ -55,6 +55,7 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await page.route(/\/api\/agent-session\?/, (route) =>
         route.fulfill({
           json: {
+            session: sessions[0],
             events: [
               {
                 id: "e1",
