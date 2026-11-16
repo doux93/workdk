@@ -23,7 +23,8 @@
     "test:integration": "node tests/agent-integration.mjs",
     "test:windows": "node tests/windows-install.mjs",
     "package:agent": "python scripts/package-agent.py",
-    "check:package": "python scripts/package-agent.py --check"
+    "check:package": "python scripts/package-agent.py --check",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "lucide-react": "1.31.0",
@@ -31,6 +32,7 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.57.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.9",
