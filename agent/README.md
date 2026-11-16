@@ -1,4 +1,4 @@
-# 工作台 Agent 采集器 1.5.0
+# 工作台 Agent 采集器 1.5.1
 
 需要 Node.js 22.13+。无需额外 npm 依赖。采集器只处理明确加入允许列表的项目；不会读取完整历史对话、文件正文或工具命令全文。任务描述、最终回复、工具名称、文件名和可取得的退出码会经过基础脱敏后同步。脱敏不能保证识别所有业务秘密，请只选择允许上传的工作目录。
 
@@ -29,7 +29,23 @@ Hooks 配置位置为 `~/.codex/hooks.json`、`~/.claude/settings.json`。卸载
 
 ## WorkBuddy MCP
 
-在 WorkBuddy 中添加本地 stdio MCP，命令设为 Node 的完整路径，参数为 `mcp.mjs` 的完整路径。包内 `mcp.example.json` 为示例。该入口提供 `record_work` 工具，需传 `project`（允许列表中的项目名）、`session`（稳定任务编号）、`summary`，可选 `evidence` 和 `kind`（stop/error/tool）。让 WorkBuddy 在任务结束时调用它，采集器运行后即可上传。MCP 工具调用本身依赖 Agent，不能保证所有任务都会自动调用；第一版尚未适配 WorkBuddy 原生完成回调。
+完成初始化和项目配置后，在解压的采集器目录运行：
+
+```sh
+node collector.mjs install-mcp
+```
+
+安装器会合并用户级 `~/.workbuddy/mcp.json`，写入当前 Node、MCP 脚本和采集目录的绝对路径；保留其他服务器，修改前备份原文件。重复执行不重复添加。不把上传凭据复制进 MCP 配置。若文件损坏或同名条目不是本工具，会保留原文件并提示处理。移动采集器目录或更换 Node 后重新运行此命令。
+
+然后在 WorkBuddy「插件 → MCP 服务器」重新连接 `workdk-journal`，确认连接成功。项目级 `.workbuddy/mcp.json` 若有同名配置，需检查是否遮盖用户级配置。也可参考包内 `mcp.example.json` 手动填写。卸载只需从对应文件的 `mcpServers` 删除 `workdk-journal` 条目，不要覆盖整个文件。
+
+提供 `record_work` 工具：必填 `project`（允许列表中的名称，最多 200 字符）、`session`（稳定任务编号，最多 200 字符）、`summary`（非空，最多 12000 字符）；可选 `evidence`（最多 8000 字符）和 `kind`（stop/error/tool，默认 stop）。未知字段、空摘要和超长内容会明确报错，不会悄悄截断或接受伪造来源。
+
+调用示例：请使用 `record_work`，项目为安装时填写的项目名，会话为当前任务的稳定编号，记录本轮实际完成的修改、验证结果和未完成事项。不要包含完整对话、文件正文或凭据。
+
+MCP 无需加载 SQLite，记录先脱敏并持久写入 outbox；`start-agent.cmd` / `collector.mjs run` 会转入队列并上传。工具成功仅表示本地已保存，服务器是否收到请用 `status-agent.cmd` 查看。网络重传使用同一事件 ID；重新调用 MCP 会生成新记录，响应丢失后重复调用可能产生重复摘要。
+
+MCP 自动调用依赖 Agent，不能保证每轮都会调用。尚未适配 WorkBuddy 桌面版原生完成回调；CodeBuddy CLI 的 Hooks 文档不能直接当作桌面版接口使用。真实 WorkBuddy 应用会话仍需在本机验收。
 
 ## 行为与限制
 

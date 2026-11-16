@@ -1,4 +1,4 @@
-# 测试与性能说明（1.5.0）
+# 测试与性能说明（1.5.1）
 
 ## 一次完成检查
 
@@ -7,7 +7,7 @@ npm ci
 npm run check
 ```
 
-`check` 顺序执行 17 项数据测试、41 项 Agent 测试、36 项自动界面测试（共 94 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
+`check` 顺序执行 17 项数据测试、51 项 Agent 测试、36 项自动界面测试（共 104 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
 
 ## 自动界面测试
 
@@ -86,3 +86,11 @@ Agent 测试增至 28 项，连同 17 项数据及 21 项界面测试共 66 项�
 新增 7 项 Agent 测试：真实 HTTP 签发与哈希存储、上传范围与读取/修改限制、单设备停用及独立队列补传、鉴权后停用竞态、跨站来源与旧凭据显式兼容、独立采集器进程保留身份/项目、迁移 SQL 与本机表结构一致。
 
 新增 4 项 UI 测试验证签发、确认取消、停用失败恢复、旧设备升级和卸载取消请求；新增 1 项真实浏览器流程验证配置下载、停用和重新签发。合计 94 项数据/Agent/UI 测试及 9 项浏览器测试。三套主题的桌面/窄屏用例也保存设备管理截图。
+
+## WorkBuddy MCP 回归（1.5.1）
+
+新增 10 项 MCP / 安装测试：已支持版本协商、协议错误恢复、初始化时序、通知无副作用、UTF-8 分块与消息上限、参数白名单和长度、禁用 SQLite 模块时的真实子进程落盘、脱敏及队列确认、故障提示、保留其他服务器与备份、无效配置拒绝覆盖，以及按生成配置直接启动 MCP。Windows CI 对发布 ZIP 运行同一组测试；跨进程集成测试覆盖 MCP → outbox → SQLite → HTTP 接收器。
+
+协议适配范围为 stdio 的 2024-11-05、2025-06-18、2025-11-25；其他版本返回 2025-11-25，由客户端判断是否兼容。不声明支持要求批量请求的 2025-03-26 或新的无会话协议。只声明 tools 能力，不实现 HTTP MCP、资源或提示词接口。依据 [MCP 生命周期](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle)、[工具错误处理](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)及 [stdio 传输](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)。
+
+三主题、两种宽度的现有浏览器用例展开并截图 WorkBuddy 指引，检查内容无横向溢出。自动测试不等于真实 WorkBuddy 桌面会话验收，亦不代表已部署云端 D1 迁移。

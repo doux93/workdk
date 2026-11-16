@@ -245,6 +245,7 @@ try {
         clientInfo: { name: "qa", version: "1" },
       },
     },
+    { jsonrpc: "2.0", method: "notifications/initialized" },
     { jsonrpc: "2.0", id: 2, method: "tools/list" },
     {
       jsonrpc: "2.0",

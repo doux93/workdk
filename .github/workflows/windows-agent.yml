@@ -34,3 +34,6 @@ jobs:
           $agentDir = Join-Path $destination 'workdk-agent'
           node tests/windows-install.mjs --agent-dir $agentDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:WORKDK_TEST_AGENT_DIR = $agentDir
+          node --test tests/agent/mcp.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
