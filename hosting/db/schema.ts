@@ -1,4 +1,4 @@
-import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 export const agentEvents = sqliteTable(
   "agent_events",
   {
@@ -26,3 +26,15 @@ export const agentAnnotations = sqliteTable("agent_annotations", {
   project: text("project").notNull().default(""),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const agentDevices = sqliteTable(
+  "agent_devices",
+  {
+    device: text("device").primaryKey().notNull(),
+    label: text("label").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [uniqueIndex("agent_device_token").on(table.tokenHash)],
+);

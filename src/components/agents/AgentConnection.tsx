@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { downloadFile } from "../../agent/download";
 import { Modal } from "../shared";
+import AgentDevices from "./AgentDevices";
 import type { AgentDevice } from "../../agent/model";
 export default function AgentConnection({
   devices,
@@ -10,18 +11,32 @@ export default function AgentConnection({
   devices: AgentDevice[];
   onClose: () => void;
 }) {
+  const [label, setLabel] = useState("我的电脑");
+  const [revision, setRevision] = useState(0);
+  const [notice, setNotice] = useState("");
   const [configError, setConfigError] = useState("");
   const [configBusy, setConfigBusy] = useState(false);
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
-  async function downloadConfig() {
+  async function downloadConfig(device?: string, deviceLabel = label) {
     if (active.current) return;
+    if (!deviceLabel.trim()) {
+      setConfigError("请填写电脑名称。");
+      return;
+    }
     const controller = new AbortController();
     active.current = controller;
     setConfigError("");
+    setNotice("");
     setConfigBusy(true);
     try {
       const r = await fetch("/api/agent-setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: deviceLabel.trim(),
+          ...(device ? { device } : {}),
+        }),
         credentials: "same-origin",
         cache: "no-store",
         signal: controller.signal,
@@ -53,8 +68,13 @@ export default function AgentConnection({
           "下载请求跳转到了登录页面，请点击“在新窗口下载”完成正常登录后重试。",
         );
       const blob = await r.blob();
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
         downloadFile(blob, "workdk-agent.config.json");
+        setNotice(
+          "已生成独立连接配置，请仅在对应电脑导入。若下载未完成，可在设备列表重新签发。",
+        );
+        setRevision((n) => n + 1);
+      }
     } catch (e) {
       if (!controller.signal.aborted)
         setConfigError(
@@ -77,19 +97,32 @@ export default function AgentConnection({
         <ol>
           <li>
             <b>下载采集器与连接配置</b>
-            <p>连接配置含私有访问凭据，请只保存在自己的电脑上。</p>
+            <p>
+              连接配置含私有访问凭据，请只保存在对应电脑上，每台电脑分别生成。
+            </p>
+            <label>
+              电脑名称
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                maxLength={80}
+                disabled={configBusy}
+                placeholder="例如：办公室 Windows"
+              />
+            </label>
             <div className="button-row">
               <a className="button" href="/workdk-agent.zip" download>
                 下载采集器
               </a>
               <button
                 className="button primary"
-                onClick={downloadConfig}
+                onClick={() => void downloadConfig()}
                 disabled={configBusy}
               >
                 {configBusy ? "正在下载…" : "下载连接配置"}
               </button>
             </div>
+            {notice && <p role="status">{notice}</p>}
             {configError && (
               <div>
                 <p role="alert">{configError}</p>
@@ -132,17 +165,12 @@ export default function AgentConnection({
           WorkBuddy 可通过包内 MCP 工具接入，详见
           README。采集器仅上报选定项目的摘要和工具元数据，不读取完整历史对话或文件正文；任务描述和最终回复会经过过滤后上报。
         </p>
-        <h3>已上报设备</h3>
-        {devices.length ? (
-          devices.map((d) => (
-            <p key={d.device}>
-              <code>{d.device.slice(0, 8)}</code> · {d.count} 条事件 · 最近同步{" "}
-              {new Date(d.lastSync).toLocaleString()}
-            </p>
-          ))
-        ) : (
-          <p>尚未收到设备数据，首次上传后会显示在这里。</p>
-        )}
+        <AgentDevices
+          devices={devices}
+          revision={revision}
+          busy={configBusy}
+          onIssue={(device, name) => void downloadConfig(device, name)}
+        />
       </div>
     </Modal>
   );

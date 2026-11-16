@@ -133,7 +133,16 @@ try {
     if (!file)
       throw new Error("用法：node agent/collector.mjs init 配置文件.json");
     const config = safeConfig(JSON.parse(readFileSync(file, "utf8")));
-    config.device = randomUUID();
+    config.device ||= randomUUID();
+    if (existsSync(configPath)) {
+      const previous = load();
+      if (previous.device !== config.device && config.version === 2)
+        throw new Error(
+          "设备编号与当前采集器不一致。请在设备列表为原设备重新签发配置，避免阻塞已有队列。",
+        );
+      if (previous.device === config.device)
+        config.projects = previous.projects;
+    }
     // Each project must be explicitly selected on this computer; the downloaded config starts with an empty allowlist.
     mkdirSync(home, { recursive: true, mode: 0o700 });
     if (existsSync(configPath))

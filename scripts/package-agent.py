@@ -14,7 +14,7 @@ def build_archive():
         for source in sorted((ROOT / "agent").iterdir()):
             if (source.name.startswith(".") or not source.is_file()
                     or source.suffix not in {".mjs", ".cmd", ".ps1", ".md", ".json"}
-                    or source.name in {"server.mjs", "service.mjs"}
+                    or source.name in {"server.mjs", "service.mjs", "credentials.mjs"}
                     or (source.suffix == ".json" and source.name != "mcp.example.json")):
                 continue
             data = source.read_bytes()

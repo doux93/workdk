@@ -51,7 +51,7 @@ export function accessFailure({
       return {
         status: 503,
         code: "SETUP_NOT_CONFIGURED",
-        error: "连接配置尚未就绪，服务端缺少采集或私有服务凭据，请联系维护者。",
+        error: "连接配置尚未就绪，服务端缺少私有服务凭据，请联系维护者。",
       };
   }
   return null;

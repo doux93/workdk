@@ -78,6 +78,20 @@ for (const theme of ["light", "sand", "dark"] as const) {
           },
         }),
       );
+      await page.route("**/api/agent-devices", (route) =>
+        route.fulfill({
+          json: {
+            devices: [
+              {
+                device: "test-device",
+                label: "测试电脑",
+                created_at: at,
+                revoked_at: null,
+              },
+            ],
+          },
+        }),
+      );
       await page.goto("/#agents");
       await expect(
         page.getByRole("heading", { name: "修复保存流程与上传队列" }),
@@ -130,6 +144,13 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await expect(
         page.getByRole("link", { name: "下载采集器" }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "停用设备" }),
+      ).toBeVisible();
+      await page.screenshot({
+        path: info.outputPath("devices.png"),
+        fullPage: true,
+      });
       await page.mouse.click(4, 4);
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(
