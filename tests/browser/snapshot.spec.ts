@@ -107,7 +107,13 @@ test("新用户首页保持紧凑，可展开全部模块并在刷新后保留�
   page,
 }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.route(/\/api\/agent-sessions\?/, (route) =>
+    route.fulfill({ json: { sessions: [], devices: [], hasMore: false } }),
+  );
   await page.goto("/#home");
+  await expect(page.locator(".agent-today")).toContainText(
+    "今天还没有工作记录",
+  );
   await expect(
     page.getByText("从今天的一件事开始", { exact: true }),
   ).toBeVisible();
