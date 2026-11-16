@@ -144,6 +144,17 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await expect(
         page.getByRole("link", { name: "下载采集器" }),
       ).toBeVisible();
+      await page
+        .getByText("使用 WorkBuddy？展开接入步骤", { exact: true })
+        .click();
+      await expect(
+        page.getByText("node collector.mjs install-mcp", { exact: true }),
+      ).toBeVisible();
+      const guide = page.locator(".agent-mcp-guide");
+      expect(
+        await guide.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      ).toBe(true);
+      await guide.screenshot({ path: info.outputPath("workbuddy-guide.png") });
       await page.getByRole("button", { name: "管理设备" }).click();
       await expect(
         page.getByRole("button", { name: "停用设备" }),

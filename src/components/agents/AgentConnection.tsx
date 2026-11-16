@@ -187,9 +187,23 @@ export default function AgentConnection({
               </p>
             </li>
           </ol>
+          <details className="agent-mcp-guide">
+            <summary>使用 WorkBuddy？展开接入步骤</summary>
+            <p>完成上方安装后，在解压的采集器目录运行：</p>
+            <code>node collector.mjs install-mcp</code>
+            <p>
+              在 WorkBuddy 的「插件 → MCP 服务器」中重新连接 workdk-journal，
+              然后让它调用 record_work
+              记录本轮摘要。项目名应与安装时填写的一致。
+            </p>
+            <p>
+              请保持上传窗口运行。MCP 调用成功表示已保存到本地， 同步结果可用
+              status-agent.cmd 查看。记录仍依赖工具调用，尚不支持原生完成回调。
+            </p>
+          </details>
           <p>
-            WorkBuddy 可通过包内 MCP 工具接入，详见
-            README。采集器仅上报选定项目的摘要和工具元数据，不读取完整历史对话或文件正文；任务描述和最终回复会经过过滤后上报。
+            采集器仅上报选定项目的摘要和工具元数据，不读取完整历史对话或文件正文；
+            任务描述和最终回复会经过过滤后上报。
           </p>
         </div>
         <div hidden={panel !== "devices"}>

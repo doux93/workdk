@@ -608,3 +608,23 @@
   gap: 8px;
   margin: 18px 0;
 }
+
+.agent-mcp-guide {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+.agent-mcp-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.agent-mcp-guide code {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+  user-select: all;
+}

@@ -164,6 +164,20 @@ try {
     if (!config.projects.length) throw new Error("请先添加至少一个项目");
     for (const source of ["codex", "claude"])
       await installHooks(config, source);
+  } else if (command === "install-mcp") {
+    const config = load();
+    if (!config.projects.length) throw new Error("请先添加至少一个项目");
+    const { installWorkBuddyMcp } = await import("./mcp-install.mjs");
+    const result = installWorkBuddyMcp({ home });
+    console.log(
+      result.changed
+        ? "WorkBuddy MCP 已配置：" + result.target
+        : "WorkBuddy MCP 配置已是最新。",
+    );
+    if (result.backup) console.log("原配置备份：" + result.backup);
+    console.log(
+      "请在 WorkBuddy → 插件 → MCP 服务器中重新连接 workdk-journal，并保持上传进程运行。",
+    );
   } else if (command === "hook") {
     const { adaptHook } = await import("./adapter.mjs");
     const config = load(),
@@ -236,7 +250,7 @@ try {
     }
   } else
     throw new Error(
-      "支持：init / add-project / install-hooks / run / sync / status / record",
+      "支持：init / add-project / install-hooks / install-mcp / run / sync / status / record",
     );
 } catch (e) {
   if (command === "hook") logHookError(e);

@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+import { AGENT_VERSION } from "./version.mjs";
 export function supportedNode(version) {
   const [major, minor] = version.replace(/^v/, "").split(".").map(Number);
   return major > 22 || (major === 22 && minor >= 13);
@@ -59,7 +60,7 @@ export async function main() {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     console.log(
-      "工作台采集器安装 · 1.5.0\n先从工作台“Agent 工作日志 → 连接电脑”下载连接配置。路径可以带引号。",
+      `工作台采集器安装 · ${AGENT_VERSION}\n先从工作台“Agent 工作日志 → 连接电脑”下载连接配置。路径可以带引号。`,
     );
     const configFile = await rl.question("连接配置文件路径：");
     const projectDir = await rl.question("允许采集的项目目录：");
@@ -69,7 +70,7 @@ export async function main() {
     const inputs = validateInputs(configFile, projectDir);
     configure({ ...inputs, name });
     console.log(
-      "\n配置完成。请检查 Codex / Claude Code 的新回调，再运行 start-agent.cmd。\n使用期间保留上传窗口。可选开机启动见 README.md。",
+      "\n配置完成。请检查 Codex / Claude Code 的新回调，再运行 start-agent.cmd。\n使用期间保留上传窗口。可选开机启动见 README.md。\n使用 WorkBuddy 时，另运行 node collector.mjs install-mcp 配置 MCP。",
     );
   } finally {
     rl.close();
