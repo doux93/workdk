@@ -1,26 +1,26 @@
 "use client";
+import {
+ArrowUpRight,
+Feather,
+MoreHorizontal,
+Plus,
+SlidersHorizontal,
+Sparkles,
+} from "lucide-react";
 import React from "react";
-import TodayFocus from "./TodayFocus";
 import { useToday } from "../hooks/useToday";
 import {
-  ArrowUpRight,
-  MoreHorizontal,
-  Plus,
-  SlidersHorizontal,
-  Sparkles,
-  Feather,
-} from "lucide-react";
-import {
-  type Entry,
-  type Module,
-  type Workspace,
-  views,
-  colors,
-  dateKey,
-  modulePurpose,
-  safeUrl,
+type Entry,
+type Module,
+type Workspace,
+colors,
+dateKey,
+modulePurpose,
+safeUrl,
+views,
 } from "../workspace";
-import { Icon, Empty } from "./shared";
+import { Empty,Icon } from "./shared";
+import TodayFocus from "./TodayFocus";
 export default function HomeDashboard({
   data,
   visible,
@@ -33,8 +33,10 @@ export default function HomeDashboard({
   setSelectedDate,
   onQuickCapture,
   agentSummary,
+  onHomeMode,
 }: {
   onQuickCapture: () => void;
+  onHomeMode: (mode: "focused" | "expanded") => void;
   agentSummary?: React.ReactNode;
   data: Workspace;
   visible: Module[];
@@ -52,10 +54,27 @@ export default function HomeDashboard({
   setSelectedDate: (date: string) => void;
 }) {
   const today = useToday();
+  const expanded = data.homeMode === "expanded";
+  const hasReal = (m: Module) => m.entries.some((e) => !e.sample);
+  const activeModules = visible.filter(hasReal);
+  const shownModules = expanded ? visible : activeModules.slice(0, 4);
+  const hasSide =
+    expanded ||
+    visible.some(
+      (m) =>
+        (modulePurpose(m) === "notes" && hasReal(m)) ||
+        (modulePurpose(m) === "schedule" &&
+          m.entries.some((e) => !e.sample && e.date === today)),
+    );
+
   const itemLink = (module: Module, entry: Entry) =>
     navigate(`modules/${module.id}/items/${entry.id}`);
-  const notes = visible.find((m) => modulePurpose(m) === "notes");
-  const links = visible.find((m) => modulePurpose(m) === "links");
+  const notes =
+    visible.find((m) => modulePurpose(m) === "notes" && hasReal(m)) ||
+    visible.find((m) => modulePurpose(m) === "notes");
+  const links =
+    visible.find((m) => modulePurpose(m) === "links" && hasReal(m)) ||
+    visible.find((m) => modulePurpose(m) === "links");
   const schedule = visible.find((m) => modulePurpose(m) === "schedule");
   const todayEvents = (schedule?.entries || [])
     .filter((e) => e.date === today && !e.sample)
@@ -144,30 +163,35 @@ export default function HomeDashboard({
         </button>
       </div>
       <div className="quick-links">
-        {links?.entries.slice(0, 4).map((e, i) => (
-          <a
-            key={e.id}
-            href={safeUrl(e.url) || undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(ev) => {
-              if (!safeUrl(e.url)) {
-                ev.preventDefault();
-                itemLink(links, e);
-              }
-            }}
-          >
-            <span className={"shortcut-icon tone-" + colors[i % colors.length]}>
-              {e.title === "ChatGPT" ? (
-                <Sparkles size={20} />
-              ) : (
-                e.title.charAt(0)
-              )}
-            </span>
-            <span>{e.title}</span>
-            <ArrowUpRight size={13} />
-          </a>
-        ))}
+        {links?.entries
+          .filter((e) => expanded || !e.sample)
+          .slice(0, 4)
+          .map((e, i) => (
+            <a
+              key={e.id}
+              href={safeUrl(e.url) || undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(ev) => {
+                if (!safeUrl(e.url)) {
+                  ev.preventDefault();
+                  itemLink(links, e);
+                }
+              }}
+            >
+              <span
+                className={"shortcut-icon tone-" + colors[i % colors.length]}
+              >
+                {e.title === "ChatGPT" ? (
+                  <Sparkles size={20} />
+                ) : (
+                  e.title.charAt(0)
+                )}
+              </span>
+              <span>{e.title}</span>
+              <ArrowUpRight size={13} />
+            </a>
+          ))}
         {!links?.entries.length && (
           <button
             className="text-button"
@@ -179,6 +203,7 @@ export default function HomeDashboard({
       </div>
     </section>
   );
+  const latestNote = notes?.entries.find((e) => expanded || !e.sample);
   const renderNote = () => (
     <section className="panel note-panel">
       <div className="panel-heading">
@@ -194,16 +219,16 @@ export default function HomeDashboard({
           <Plus size={18} />
         </button>
       </div>
-      {notes?.entries[0] ? (
+      {notes && latestNote ? (
         <button
           className="note-preview"
-          onClick={() => itemLink(notes, notes.entries[0])}
+          onClick={() => itemLink(notes, latestNote)}
         >
           <span className="tiny-label">留住一个好想法</span>
-          <h3>{notes.entries[0].title}</h3>
-          <p>{notes.entries[0].description}</p>
+          <h3>{latestNote.title}</h3>
+          <p>{latestNote.description}</p>
           <span className="note-meta">
-            {notes.entries[0].date || "未设日期"}
+            {latestNote.date || "未设日期"}
             <ArrowUpRight size={16} />
           </span>
         </button>
@@ -247,7 +272,7 @@ export default function HomeDashboard({
           </button>
         </div>
       </div>
-      <div className="dashboard-grid">
+      <div className={"dashboard-grid " + (!hasSide ? "dashboard-single" : "")}>
         <div className="dashboard-primary">
           <TodayFocus
             modules={visible}
@@ -257,19 +282,20 @@ export default function HomeDashboard({
             onCapture={onQuickCapture}
           />
           {agentSummary}
-          <section className="module-section">
+          <section className="module-section" aria-label="工作模块">
             <div className="section-heading">
               <h2>
-                我的模块<span>让工作台，成为你的样子</span>
+                {expanded ? "我的模块" : "正在使用"}
+                <span>更多入口仍在导航中</span>
               </h2>
               <button className="text-button" onClick={() => onManageModules()}>
                 管理模块 <SlidersHorizontal size={14} />
               </button>
             </div>
-            <div className="module-grid">
-              {visible.map((m) => (
+            <div className={expanded ? "module-grid" : "module-shortcuts"}>
+              {shownModules.map((m) => (
                 <button
-                  className="module-card"
+                  className={expanded ? "module-card" : "module-shortcut"}
                   key={m.id}
                   onClick={() => navigate(`modules/${m.id}`)}
                 >
@@ -289,24 +315,44 @@ export default function HomeDashboard({
                   </div>
                 </button>
               ))}
-              <button
-                className="module-card add-module-card"
-                onClick={() => openModule()}
-              >
-                <span className="add-module-icon">
-                  <Plus size={24} />
-                </span>
-                <h3>新的可能</h3>
-                <p>创建一个属于你的模块</p>
-              </button>
+              {expanded && (
+                <button
+                  className="module-card add-module-card"
+                  onClick={() => openModule()}
+                >
+                  <span className="add-module-icon">
+                    <Plus size={24} />
+                  </span>
+                  <h3>新的可能</h3>
+                  <p>创建一个属于你的模块</p>
+                </button>
+              )}
             </div>
+            {!expanded && !shownModules.length && (
+              <p className="module-hint">
+                保存第一条记录后，对应模块会出现在这里。
+              </p>
+            )}
+            <button
+              className="text-button dashboard-toggle"
+              aria-expanded={expanded}
+              onClick={() => onHomeMode(expanded ? "focused" : "expanded")}
+            >
+              {expanded
+                ? "收起辅助卡片"
+                : `展开全部模块与辅助卡片（${visible.length}）`}
+            </button>
           </section>
-          {links && renderLinks()}
+          {links && (expanded || hasReal(links)) && renderLinks()}
         </div>
-        <div className="dashboard-secondary">
-          {schedule && renderSchedule()}
-          {notes && renderNote()}
-        </div>
+        {hasSide && (
+          <div className="dashboard-secondary">
+            {schedule &&
+              (expanded || todayEvents.length > 0) &&
+              renderSchedule()}
+            {notes && (expanded || hasReal(notes)) && renderNote()}
+          </div>
+        )}
       </div>
     </>
   );

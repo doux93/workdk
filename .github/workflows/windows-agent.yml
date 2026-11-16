@@ -4,12 +4,20 @@ on:
     branches: [main]
     paths:
       - "agent/**"
+      - "server/**"
+      - "shared/**"
+      - "tests/agent/workspace.test.mjs"
+      - "tests/agent-integration.mjs"
       - "public/workdk-agent.zip"
       - "tests/windows-install.mjs"
       - ".github/workflows/windows-agent.yml"
   pull_request:
     paths:
       - "agent/**"
+      - "server/**"
+      - "shared/**"
+      - "tests/agent/workspace.test.mjs"
+      - "tests/agent-integration.mjs"
       - "public/workdk-agent.zip"
       - "tests/windows-install.mjs"
       - ".github/workflows/windows-agent.yml"
@@ -36,4 +44,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:WORKDK_TEST_AGENT_DIR = $agentDir
           node --test tests/agent/mcp.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test snapshot API and collector-to-server flow on Windows
+        shell: pwsh
+        run: |
+          node --test tests/agent/workspace.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tests/agent-integration.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

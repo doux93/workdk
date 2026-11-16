@@ -1,0 +1,142 @@
+:root {
+  --bg: #f6f7f5;
+  --panel: #fff;
+  --sidebar: #fdfdfb;
+  --text: #293830;
+  --muted: #8a928b;
+  --secondary: #67746a;
+  --line: #e9ede7;
+  --accent: #3d6b53;
+  --accent-dark: #2c513e;
+  --soft: #edf3ec;
+  --hero: #edf2e9;
+  --shadow: 0 3px 18px #233b2c03;
+  --note: #faf8ef;
+  --radius: 15px;
+  color-scheme: light;
+}
+:root[data-theme="sand"] {
+  --bg: #f7f4ee;
+  --panel: #fffdf9;
+  --sidebar: #fdfaf5;
+  --text: #483b32;
+  --muted: #9a8b7a;
+  --secondary: #84735f;
+  --line: #eee7dd;
+  --accent: #997650;
+  --accent-dark: #795c3e;
+  --soft: #f3ebdf;
+  --hero: #f1e8d8;
+  --note: #f9f0df;
+}
+:root[data-theme="dark"] {
+  --bg: #171d1b;
+  --panel: #202824;
+  --sidebar: #1b221e;
+  --text: #e2e9df;
+  --muted: #87968a;
+  --secondary: #adbbaf;
+  --line: #303c34;
+  --accent: #91b79c;
+  --accent-dark: #aacdb5;
+  --soft: #2c3c30;
+  --hero: #28372b;
+  --note: #30352a;
+  color-scheme: dark;
+  --shadow: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Noto Sans SC",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Microsoft YaHei",
+    sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+}
+button {
+  background: none;
+  border: none;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #86ad7c;
+  outline-offset: 4px;
+}
+input,
+select,
+textarea {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 11px 12px;
+  min-width: 0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+textarea {
+  resize: vertical;
+  line-height: 1.8;
+}
+button,
+a {
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+::selection {
+  background: #cfdfc8;
+}

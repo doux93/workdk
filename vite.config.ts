@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     base: "./",
     server: {
       proxy: {
-        "/api/agent": {
+        "^/api/(agent|workspace-snapshot)": {
           target: "http://127.0.0.1:8788",
           changeOrigin: true,
           headers: env.WORKDK_INGEST_TOKEN

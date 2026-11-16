@@ -26,6 +26,7 @@ export default function TodayFocus({
     done: "已完成",
   };
   const items = groups[tab];
+  const firstRecord = !modules.some((m) => m.entries.some((e) => !e.sample));
   return (
     <section className="panel tasks-panel daily-focus" aria-label="今日聚焦">
       <div className="panel-heading">
@@ -113,7 +114,9 @@ export default function TodayFocus({
         <div className="focus-empty">
           <b>
             {tab === "today"
-              ? "今天还没有待完成的安排"
+              ? firstRecord
+                ? "从今天的一件事开始"
+                : "今天还没有待完成的安排"
               : tab === "overdue"
                 ? "没有逾期事项"
                 : tab === "done"
@@ -122,7 +125,9 @@ export default function TodayFocus({
           </b>
           <p>
             {tab === "today"
-              ? "记下一件想推进的事，或到“逾期”“未安排”中安排下一步。"
+              ? firstRecord
+                ? "写下一句话就能保存，日期和其他细节可以稍后补充。"
+                : "记下一件想推进的事，或到“逾期”“未安排”中安排下一步。"
               : "每条记录都会保留在原模块中。"}
           </p>
           {tab === "today" && (

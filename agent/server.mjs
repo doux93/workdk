@@ -1,3 +1,4 @@
+import { MAX_WORKSPACE_BYTES } from "../server/workspace-service.mjs";
 import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { resolve } from "node:path";
@@ -26,11 +27,15 @@ export function createAgentServer({ db, token }) {
   };
   const server = createServer(async (req, res) => {
     try {
+      const limit =
+        req.url?.split("?")[0] === "/api/workspace-snapshot"
+          ? MAX_WORKSPACE_BYTES + 1024
+          : MAX_BATCH_BYTES;
       const chunks = [];
       let bytes = 0;
       for await (const chunk of req) {
         bytes += chunk.length;
-        if (bytes > MAX_BATCH_BYTES) {
+        if (bytes > limit) {
           res.writeHead(413).end();
           return;
         }

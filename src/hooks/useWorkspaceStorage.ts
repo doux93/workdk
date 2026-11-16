@@ -1,4 +1,5 @@
 "use client";
+import { saveRecovery } from "../storage/backup";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   initialWorkspace,
@@ -115,17 +116,28 @@ export function useWorkspaceStorage() {
     }
   };
 
-  // Only used after the user confirms restoring a validated backup.
+  // Explicit replacement only: preserve what the user is replacing before applying it.
   const restore = (workspace: Workspace) => {
+    let current: string | null;
     try {
-      expectedRaw.current = localStorage.getItem(STORE);
+      current = localStorage.getItem(STORE);
+      if (current !== expectedRaw.current) {
+        setStorageConflict({ raw: current });
+        return false;
+      }
+      const before = recoveryRaw ?? (data ? JSON.stringify(data) : current);
+      if (before && before !== JSON.stringify(workspace)) saveRecovery(before);
     } catch {
-      expectedRaw.current = null;
+      throw new Error(
+        "无法保留替换前的副本，本机内容未改变。请先导出备份并释放浏览器空间后重试。",
+      );
     }
+    expectedRaw.current = current;
     setStorageConflict(null);
     setRecoveryRaw(null);
     setSaveError("");
     setData(workspace);
+    return true;
   };
 
   return {

@@ -1,18 +1,21 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Bot, ArrowRight } from "lucide-react";
-import { dateKey } from "../../workspace";
+import { useToday } from "../../hooks/useToday";
 import { requestJson } from "../../agent/api";
 import type { SessionPage } from "../../agent/model";
 export function AgentToday({ navigate }: { navigate: (p: string) => void }) {
+  const today = useToday();
   const [count, setCount] = useState<number | null>(null);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     requestJson<SessionPage>(
       "/api/agent-sessions?day=" +
-        dateKey() +
+        today +
         "&offsetMinutes=" +
         -new Date().getTimezoneOffset(),
+      { signal: controller.signal },
     )
       .then((d) => {
         if (active) setCount(d.sessions.length + (d.hasMore ? 1 : 0));
@@ -20,10 +23,13 @@ export function AgentToday({ navigate }: { navigate: (p: string) => void }) {
       .catch(() => {});
     return () => {
       active = false;
+      controller.abort();
     };
-  }, []);
+  }, [today]);
   return (
-    <section className="panel agent-today">
+    <section
+      className={"panel agent-today " + (!count ? "agent-today-quiet" : "")}
+    >
       <span className="agent-logo">
         <Bot size={23} />
       </span>
