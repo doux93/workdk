@@ -29,6 +29,7 @@ for (const theme of ["light", "sand", "dark"] as const) {
           workspace: (() => {
             const d = initialWorkspace();
             d.theme = theme;
+        d.homeMode = "expanded";
             d.modules.forEach((m) => (m.entries = []));
             d.modules[0].entries = [
               {

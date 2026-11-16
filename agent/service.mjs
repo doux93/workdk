@@ -1,4 +1,8 @@
 import {
+  workspaceSchemaSql,
+  handleWorkspaceRequest,
+} from "../server/workspace-service.mjs";
+import {
   normalizeEvent,
   sessionKey,
   MAX_BATCH_BYTES,
@@ -6,6 +10,7 @@ import {
 } from "./core.mjs";
 import { credentialSchemaSql, issueCredential } from "./credentials.mjs";
 export const schemaSql =
+  workspaceSchemaSql +
   credentialSchemaSql +
   `CREATE TABLE IF NOT EXISTS agent_events (id TEXT PRIMARY KEY NOT NULL, session_key TEXT NOT NULL, device TEXT NOT NULL, source TEXT NOT NULL, project TEXT NOT NULL, session TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, summary TEXT NOT NULL, evidence TEXT NOT NULL, received_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS agent_session_at ON agent_events(session_key, at);
@@ -42,6 +47,8 @@ export async function handleAgentRequest(
     !(request.method === "POST" && path === "/api/agent-events")
   )
     return json({ error: "设备凭据仅允许上传记录。" }, 403);
+  if (path === "/api/workspace-snapshot")
+    return handleWorkspaceRequest(request, db, { authorized, role });
   try {
     if (request.method === "GET" && path === "/api/agent-devices") {
       const devices = await db.all(

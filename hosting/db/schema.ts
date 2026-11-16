@@ -1,4 +1,10 @@
-import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 export const agentEvents = sqliteTable(
   "agent_events",
   {
@@ -38,3 +44,9 @@ export const agentDevices = sqliteTable(
   },
   (table) => [uniqueIndex("agent_device_token").on(table.tokenHash)],
 );
+
+export const workspaceSnapshots = sqliteTable("workspace_snapshots", {
+  revision: integer("revision").primaryKey().notNull(),
+  payload: text("payload").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

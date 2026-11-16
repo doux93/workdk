@@ -113,3 +113,45 @@ it("存储读取被拒绝时不会崩溃，权限恢复后重试仍保护原有�
   expect(result.current.storageConflict).not.toBeNull();
   expect(localStorage.getItem(key)).toBe(external);
 });
+
+it("恢复备份前保留被替换的内容，容量不足时拒绝替换", async () => {
+  const before = { ...initialWorkspace(), name: "本机原稿" };
+  localStorage.setItem(key, JSON.stringify(before));
+  const { result } = renderHook(() => useWorkspaceStorage());
+  await waitFor(() => expect(result.current.saveState).toBe("已保存"));
+  const write = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+  expect(() =>
+    act(() => {
+      result.current.restore({ ...before, name: "远端稿" });
+    }),
+  ).toThrow("无法保留替换前");
+  expect(result.current.data?.name).toBe("本机原稿");
+  write.mockRestore();
+  act(() => {
+    expect(result.current.restore({ ...before, name: "远端稿" })).toBe(true);
+  });
+  await waitFor(() => expect(result.current.saveState).toBe("已保存"));
+  const recovery = JSON.parse(
+    localStorage.getItem("yiyu-workspace-recovery-v1")!,
+  );
+  expect(JSON.parse(recovery.raw).name).toBe("本机原稿");
+  expect(result.current.data?.name).toBe("远端稿");
+});
+it("确认导入前其他窗口修改数据时，不覆盖对方也不替换本页", async () => {
+  const before = initialWorkspace();
+  localStorage.setItem(key, JSON.stringify(before));
+  const { result } = renderHook(() => useWorkspaceStorage());
+  await waitFor(() => expect(result.current.saveState).toBe("已保存"));
+  const external = { ...before, name: "另一窗口" };
+  localStorage.setItem(key, JSON.stringify(external));
+  act(() => {
+    expect(result.current.restore({ ...before, name: "导入稿" })).toBe(false);
+  });
+  expect(result.current.data?.name).toBe(before.name);
+  expect(result.current.storageConflict).not.toBeNull();
+  expect(JSON.parse(localStorage.getItem(key)!).name).toBe("另一窗口");
+});

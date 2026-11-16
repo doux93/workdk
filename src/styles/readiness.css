@@ -1,0 +1,112 @@
+.dashboard-grid.dashboard-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.dashboard-single .dashboard-primary {
+  max-width: 100%;
+}
+.module-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.module-shortcut {
+  min-width: 0;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.module-shortcut .module-card-top {
+  float: left;
+  margin-right: 12px;
+}
+.module-shortcut .module-card-top > svg,
+.module-shortcut > p,
+.module-shortcut .module-card-bottom > span:last-child {
+  display: none;
+}
+.module-shortcut h3 {
+  margin: 2px 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.module-shortcut .module-card-bottom {
+  margin: 0;
+}
+.module-shortcut h3,
+.module-shortcut p {
+  overflow-wrap: anywhere;
+}
+.module-hint {
+  color: var(--secondary);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.dashboard-toggle {
+  margin-top: 14px;
+  min-height: 32px;
+}
+.agent-today.agent-today-quiet {
+  padding: 14px 18px;
+  gap: 12px;
+}
+.agent-today-quiet .agent-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.agent-today-quiet p {
+  font-size: 12px;
+}
+.snapshot-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.snapshot-comparison {
+  overflow-x: auto;
+  margin: 14px 0;
+}
+.snapshot-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.snapshot-comparison caption {
+  text-align: left;
+  padding-bottom: 8px;
+  color: var(--secondary);
+}
+.snapshot-comparison th,
+.snapshot-comparison td {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 8px;
+}
+.snapshot-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.snapshot-history select {
+  width: 100%;
+  min-height: 38px;
+}
+@media (max-width: 760px) {
+  .module-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .agent-today.agent-today-quiet {
+    flex-wrap: wrap;
+  }
+  .snapshot-panel .button-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .snapshot-panel .button {
+    white-space: normal;
+  }
+}

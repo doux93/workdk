@@ -1,0 +1,145 @@
+/* Daily work: actions first, across purpose-defined modules. */
+.daily-focus,
+.dashboard-primary > .agent-today {
+  margin-bottom: 0;
+}
+.daily-focus .panel-heading > .text-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.focus-caption {
+  margin: 8px 0 0;
+  color: var(--secondary);
+  font-size: 12px;
+}
+.focus-tabs {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.focus-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+.focus-row:last-child {
+  border-bottom: 0;
+}
+.focus-item {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.focus-item b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.focus-item small {
+  display: block;
+  margin-top: 5px;
+  color: var(--secondary);
+}
+.focus-row.completed .focus-item b {
+  text-decoration: line-through;
+  color: var(--secondary);
+}
+.focus-empty {
+  padding: 28px 8px;
+  text-align: center;
+}
+.focus-empty b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.focus-empty p {
+  color: var(--secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 9px 0 16px;
+}
+.focus-more {
+  margin-top: 14px;
+}
+.quick-capture .capture-destination {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 13px;
+}
+.quick-capture summary {
+  cursor: pointer;
+  color: var(--secondary);
+  margin-bottom: 14px;
+}
+.quick-capture details[open] {
+  border-top: 1px solid var(--line);
+  padding-top: 15px;
+}
+.quick-capture details label {
+  margin-top: 12px;
+}
+.record-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.record-source p {
+  margin: 5px 0 0;
+  color: var(--secondary);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .topbar-capture {
+    padding: 8px;
+  }
+  .topbar-capture span {
+    display: none;
+  }
+  .record-source {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .focus-tabs button {
+    padding: 9px 8px;
+    font-size: 12px;
+  }
+  .daily-focus .panel-heading {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .mobile-save-status {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 20px 0;
+  }
+  .mobile-save-status .local-status {
+    margin: 0;
+    font-size: 10px;
+  }
+  .mobile-save-status + .main-content {
+    padding-top: 16px;
+  }
+  .focus-tabs {
+    gap: 4px;
+  }
+}
+@media (max-width: 480px) {
+  .dashboard-secondary,
+  .layout-focus .dashboard-secondary {
+    align-items: stretch;
+  }
+}
