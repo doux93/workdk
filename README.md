@@ -145,3 +145,5 @@ Agent 日志新增今天 / 全部日期快捷筛选、明确的项目筛选提�
 `npm run check` 覆盖数据、Agent、界面、跨进程集成、性能、构建与下载包一致性。PR 和 main 推送自动检查 Node 22.13 / 24；采集器变更另有 Windows 安装测试。云端 `hosting/` 是托管工程的增量源码，其运行环境与身份配置仍需在实际托管工程验证。
 
 真实浏览器回归：首次运行 `npx playwright install chromium`，再运行 `npm run test:browser`。检查三套主题在 1440 / 390 像素宽度下的列表、详情和连接入口，使用合成记录，并生成截图。CI 的 `journal-browser-results` 附件保留截图、失败 trace 与 HTML 报告 14 天。
+
+开发依赖 Vite 更新至 8.3.8；浏览器检查使用固定的 Playwright 1.65.1 与 Ubuntu 24.04，避免运行镜像升级造成依赖安装漂移。
