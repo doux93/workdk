@@ -237,7 +237,7 @@ test("MCP 真实进程不依赖 SQLite；脱敏后持久保存，并由现有上
         evidence: "https://example.com/file?token=hidden",
       }),
     ],
-    ["--import", bootstrap],
+    ["--import", pathToFileURL(bootstrap).href],
   );
   assert.equal(result[1].result.isError, false);
   assert.match(result[1].result.content[0].text, /入队不代表服务器已收到/);
@@ -336,7 +336,12 @@ test("WorkBuddy 安装命令生成的配置可直接启动打包 MCP，路径含
   );
   const result = spawnSync(
     process.execPath,
-    ["--import", stub, path.join(agent, "collector.mjs"), "install-mcp"],
+    [
+      "--import",
+      pathToFileURL(stub).href,
+      path.join(agent, "collector.mjs"),
+      "install-mcp",
+    ],
     {
       env: { ...process.env, WORKDK_AGENT_HOME: home },
       encoding: "utf8",
