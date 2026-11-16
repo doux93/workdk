@@ -144,6 +144,7 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await expect(
         page.getByRole("link", { name: "下载采集器" }),
       ).toBeVisible();
+      await page.getByRole("button", { name: "管理设备" }).click();
       await expect(
         page.getByRole("button", { name: "停用设备" }),
       ).toBeVisible();

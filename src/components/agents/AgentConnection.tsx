@@ -11,6 +11,8 @@ export default function AgentConnection({
   devices: AgentDevice[];
   onClose: () => void;
 }) {
+  const [panel, setPanel] = useState<"connect" | "devices">("connect");
+  const manageButton = useRef<HTMLButtonElement>(null);
   const [label, setLabel] = useState("我的电脑");
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState("");
@@ -74,6 +76,8 @@ export default function AgentConnection({
           "已生成独立连接配置，请仅在对应电脑导入。若下载未完成，可在设备列表重新签发。",
         );
         setRevision((n) => n + 1);
+        setPanel("devices");
+        manageButton.current?.focus();
       }
     } catch (e) {
       if (!controller.signal.aborted)
@@ -94,83 +98,108 @@ export default function AgentConnection({
           配置一次，之后照常使用
           Agent。电脑端采集器会在后台上传记录，网页关闭时也能同步。
         </p>
-        <ol>
-          <li>
-            <b>下载采集器与连接配置</b>
-            <p>
-              连接配置含私有访问凭据，请只保存在对应电脑上，每台电脑分别生成。
-            </p>
-            <label>
-              电脑名称
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                maxLength={80}
-                disabled={configBusy}
-                placeholder="例如：办公室 Windows"
-              />
-            </label>
-            <div className="button-row">
-              <a className="button" href="/workdk-agent.zip" download>
-                下载采集器
-              </a>
-              <button
-                className="button primary"
-                onClick={() => void downloadConfig()}
-                disabled={configBusy}
-              >
-                {configBusy ? "正在下载…" : "下载连接配置"}
-              </button>
-            </div>
-            {notice && <p role="status">{notice}</p>}
-            {configError && (
-              <div>
-                <p role="alert">{configError}</p>
-                <a
-                  className="text-button"
-                  href="/api/agent-setup"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  在新窗口下载
+        <div
+          className="agent-connection-switch"
+          role="group"
+          aria-label="连接设置"
+        >
+          <button
+            className={`button ${panel === "connect" ? "primary" : ""}`}
+            aria-pressed={panel === "connect"}
+            onClick={() => setPanel("connect")}
+          >
+            连接新电脑
+          </button>
+          <button
+            ref={manageButton}
+            className={`button ${panel === "devices" ? "primary" : ""}`}
+            aria-pressed={panel === "devices"}
+            onClick={() => setPanel("devices")}
+          >
+            管理设备
+          </button>
+        </div>
+        {notice && <p role="status">{notice}</p>}
+        {configError && (
+          <div>
+            <p role="alert">{configError}</p>
+            <a
+              className="text-button"
+              href="/api/agent-setup"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              在新窗口下载
+            </a>
+            <span> · </span>
+            <a
+              className="text-button"
+              href="/signin-with-chatgpt?return_to=%2F%23agents"
+              target="_top"
+            >
+              重新登录工作台
+            </a>
+          </div>
+        )}
+        <div hidden={panel !== "connect"}>
+          <ol>
+            <li>
+              <b>下载采集器与连接配置</b>
+              <p>
+                连接配置含私有访问凭据，请只保存在对应电脑上，每台电脑分别生成。
+              </p>
+              <label>
+                电脑名称
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  maxLength={80}
+                  disabled={configBusy}
+                  placeholder="例如：办公室 Windows"
+                />
+              </label>
+              <div className="button-row">
+                <a className="button" href="/workdk-agent.zip" download>
+                  下载采集器
                 </a>
-                <span> · </span>
-                <a
-                  className="text-button"
-                  href="/signin-with-chatgpt?return_to=%2F%23agents"
-                  target="_top"
+                <button
+                  className="button primary"
+                  onClick={() => void downloadConfig()}
+                  disabled={configBusy}
                 >
-                  重新登录工作台
-                </a>
+                  {configBusy ? "正在下载…" : "下载连接配置"}
+                </button>
               </div>
-            )}
-          </li>
-          <li>
-            <b>解压并运行 setup-agent.cmd</b>
-            <p>
-              需要 Node.js 22.13
-              或更新版本。按提示选择连接配置和允许采集的项目目录。Windows、WSL
-              应分别配置各自的 Agent 环境。
-            </p>
-          </li>
-          <li>
-            <b>检查回调并启动上传</b>
-            <p>
-              在 Codex / Claude Code 中检查新回调，运行 start-agent.cmd。双击
-              status-agent.cmd 可查看本地待上传数量和错误。
-            </p>
-          </li>
-        </ol>
-        <p>
-          WorkBuddy 可通过包内 MCP 工具接入，详见
-          README。采集器仅上报选定项目的摘要和工具元数据，不读取完整历史对话或文件正文；任务描述和最终回复会经过过滤后上报。
-        </p>
-        <AgentDevices
-          devices={devices}
-          revision={revision}
-          busy={configBusy}
-          onIssue={(device, name) => void downloadConfig(device, name)}
-        />
+            </li>
+            <li>
+              <b>解压并运行 setup-agent.cmd</b>
+              <p>
+                需要 Node.js 22.13
+                或更新版本。按提示选择连接配置和允许采集的项目目录。Windows、WSL
+                应分别配置各自的 Agent 环境。
+              </p>
+            </li>
+            <li>
+              <b>检查回调并启动上传</b>
+              <p>
+                在 Codex / Claude Code 中检查新回调，运行 start-agent.cmd。双击
+                status-agent.cmd 可查看本地待上传数量和错误。
+              </p>
+            </li>
+          </ol>
+          <p>
+            WorkBuddy 可通过包内 MCP 工具接入，详见
+            README。采集器仅上报选定项目的摘要和工具元数据，不读取完整历史对话或文件正文；任务描述和最终回复会经过过滤后上报。
+          </p>
+        </div>
+        <div hidden={panel !== "devices"}>
+          <AgentDevices
+            devices={devices}
+            revision={revision}
+            busy={configBusy}
+            onIssue={(device, name) => void downloadConfig(device, name)}
+          />
+        </div>
       </div>
     </Modal>
   );

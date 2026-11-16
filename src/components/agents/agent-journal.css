@@ -570,9 +570,7 @@
 }
 
 .agent-device-management {
-  margin-top: 28px;
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
+  margin-top: 18px;
 }
 .agent-device-list {
   list-style: none;
@@ -602,4 +600,11 @@
   display: grid;
   gap: 8px;
   margin: 12px 0;
+}
+
+.agent-connection-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 18px 0;
 }
