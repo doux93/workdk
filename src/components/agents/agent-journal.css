@@ -628,3 +628,27 @@
   overflow-wrap: anywhere;
   user-select: all;
 }
+.agent-linked-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.agent-linked-tasks li {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+}
+.agent-linked-tasks button {
+  text-align: left;
+  justify-content: flex-start;
+  overflow-wrap: anywhere;
+}
+.agent-linked-tasks small {
+  color: var(--secondary);
+}
+.agent-task-link h3 {
+  width: 100%;
+  margin: 0;
+  font-size: 15px;
+}

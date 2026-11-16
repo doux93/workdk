@@ -12,6 +12,7 @@ import {
 } from "../workspace";
 import { Modal } from "./shared";
 import { useDraftGuard } from "../hooks/useDraftGuard";
+import { linkedSessionId } from "../agent/links";
 import { CustomFieldInput } from "./Fields";
 export default function RecordEditor({
   entry,
@@ -68,6 +69,9 @@ export default function RecordEditor({
           }
           onSave({
             ...entry,
+            ...(linkedSessionId(entry)
+              ? { agentSessionId: linkedSessionId(entry)! }
+              : {}),
             sample: false,
             title,
             description: String(f.get("description") || ""),

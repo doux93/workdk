@@ -20,6 +20,14 @@ const json = (data, status = 200) =>
       "X-Content-Type-Options": "nosniff",
     },
   });
+// Keep direct session links and filtered lists on the same summary rules.
+const sessionSelect = (
+  rangeSql = "",
+) => `SELECT e.session_key AS id,e.device,e.source,e.project,e.session,MIN(e.at) AS started,MAX(e.at) AS updated,COUNT(*) AS count,
+      (SELECT kind FROM agent_events WHERE session_key=e.session_key AND kind!='tool' ${rangeSql} ORDER BY at DESC,id DESC LIMIT 1) AS state,
+      COALESCE((SELECT summary FROM agent_events WHERE session_key=e.session_key AND summary!='' AND kind IN ('stop','prompt','error','interrupt') ${rangeSql} ORDER BY at DESC,id DESC LIMIT 1),'等待工作摘要') AS summary,
+      a.title AS title_override,a.summary AS summary_override,a.project AS project_override
+      FROM agent_events e LEFT JOIN agent_annotations a ON a.session_key=e.session_key`;
 /** @param {Request} request @param {any} db @param {{authorized?:boolean,role?:string,device?:string,tokenHash?:string,setup?:any}} options */
 export async function handleAgentRequest(
   request,
@@ -223,11 +231,7 @@ export async function handleAgentRequest(
           new Date(from + 86400000).toISOString(),
         );
       }
-      const sql = `SELECT e.session_key AS id,e.device,e.source,e.project,e.session,MIN(e.at) AS started,MAX(e.at) AS updated,COUNT(*) AS count,
-      (SELECT kind FROM agent_events WHERE session_key=e.session_key AND kind!='tool' ${rangeSql} ORDER BY at DESC,id DESC LIMIT 1) AS state,
-      COALESCE((SELECT summary FROM agent_events WHERE session_key=e.session_key AND summary!='' AND kind IN ('stop','prompt','error','interrupt') ${rangeSql} ORDER BY at DESC,id DESC LIMIT 1),'等待工作摘要') AS summary,
-      a.title AS title_override,a.summary AS summary_override,a.project AS project_override
-      FROM agent_events e LEFT JOIN agent_annotations a ON a.session_key=e.session_key ${where.length ? "WHERE " + where.join(" AND ") : ""} GROUP BY e.session_key ORDER BY MAX(e.at) DESC,e.session_key LIMIT 51 OFFSET ?`;
+      const sql = `${sessionSelect(rangeSql)} ${where.length ? "WHERE " + where.join(" AND ") : ""} GROUP BY e.session_key ORDER BY MAX(e.at) DESC,e.session_key LIMIT 51 OFFSET ?`;
       const rows = await db.all(sql, [...args, offset]);
       const devices = await db.all(
         "SELECT device,MAX(received_at) AS lastSync,COUNT(*) AS count FROM agent_events GROUP BY device ORDER BY MAX(received_at) DESC LIMIT 30",
@@ -241,13 +245,19 @@ export async function handleAgentRequest(
     }
     if (request.method === "GET" && path === "/api/agent-session") {
       const id = url.searchParams.get("id");
-      if (!id) return json({ error: "缺少会话编号" }, 400);
+      if (!id || id.length > 5000) return json({ error: "会话编号无效" }, 400);
+      const sessions = await db.all(
+        sessionSelect() + " WHERE e.session_key=? GROUP BY e.session_key",
+        [id],
+      );
+      if (!sessions.length) return json({ error: "会话不存在" }, 404);
       const before = url.searchParams.get("before") || "9999";
       const rows = await db.all(
         "SELECT * FROM agent_events WHERE session_key=? AND (at || id)<? ORDER BY at DESC,id DESC LIMIT 101",
         [id, before],
       );
       return json({
+        session: sessions[0],
         events: rows.slice(0, 100),
         hasMore: rows.length > 100,
         next: rows.length > 100 ? rows[99].at + rows[99].id : null,

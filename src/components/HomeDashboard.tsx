@@ -1,10 +1,9 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
+import TodayFocus from "./TodayFocus";
+import { useToday } from "../hooks/useToday";
 import {
-  ArrowRight,
   ArrowUpRight,
-  Check,
-  LayoutTemplate,
   MoreHorizontal,
   Plus,
   SlidersHorizontal,
@@ -18,6 +17,7 @@ import {
   views,
   colors,
   dateKey,
+  modulePurpose,
   safeUrl,
 } from "../workspace";
 import { Icon, Empty } from "./shared";
@@ -31,7 +31,11 @@ export default function HomeDashboard({
   onManageModules,
   setCalendarMonth,
   setSelectedDate,
+  onQuickCapture,
+  agentSummary,
 }: {
+  onQuickCapture: () => void;
+  agentSummary?: React.ReactNode;
   data: Workspace;
   visible: Module[];
   navigate: (path: string) => void;
@@ -47,139 +51,15 @@ export default function HomeDashboard({
   setCalendarMonth: (date: Date) => void;
   setSelectedDate: (date: string) => void;
 }) {
-  const [taskTab, setTaskTab] = useState("active");
+  const today = useToday();
   const itemLink = (module: Module, entry: Entry) =>
     navigate(`modules/${module.id}/items/${entry.id}`);
-  const taskModule =
-    visible.find((m) => m.id === "tasks") ||
-    visible.find((m) => m.view === "list");
-  const taskEntries = taskModule?.entries || [];
-  const done = taskEntries.filter((e) => e.status === "done").length;
-  const active = taskEntries.filter((e) => e.status !== "done");
-  const notes =
-    visible.find((m) => m.id === "notes") ||
-    visible.find((m) => m.view === "notes");
-  const links =
-    visible.find((m) => m.id === "links") ||
-    visible.find((m) => m.view === "links");
-  const schedule =
-    visible.find((m) => m.id === "schedule") ||
-    visible.find((m) => m.view === "calendar");
+  const notes = visible.find((m) => modulePurpose(m) === "notes");
+  const links = visible.find((m) => modulePurpose(m) === "links");
+  const schedule = visible.find((m) => modulePurpose(m) === "schedule");
   const todayEvents = (schedule?.entries || [])
-    .filter((e) => e.date === dateKey())
+    .filter((e) => e.date === today && !e.sample)
     .sort((a, b) => a.time.localeCompare(b.time));
-  const taskRow = (e: Entry, mid: string) => (
-    <div
-      className={"task-row " + (e.status === "done" ? "completed" : "")}
-      key={e.id}
-    >
-      <button
-        className="task-check"
-        aria-label={
-          e.status === "done" ? `取消完成 ${e.title}` : `完成 ${e.title}`
-        }
-        onClick={() =>
-          setStatus(mid, e.id, e.status === "done" ? "todo" : "done")
-        }
-      >
-        {e.status === "done" && <Check size={13} />}
-      </button>
-      <button
-        className="task-title"
-        onClick={() => navigate(`modules/${mid}/items/${e.id}`)}
-      >
-        {e.title}
-      </button>
-      {e.priority !== "普通" && (
-        <span className={"priority " + (e.priority === "紧急" ? "urgent" : "")}>
-          {e.priority}
-        </span>
-      )}
-      <span className={"task-date " + (e.date === dateKey() ? "today" : "")}>
-        {e.date === dateKey()
-          ? "今天"
-          : e.date
-            ? e.date.slice(5).replace("-", "月") + "日"
-            : ""}
-      </span>
-      <button
-        className="icon-button row-more"
-        aria-label={`编辑 ${e.title}`}
-        onClick={() => openRecord(mid, e)}
-      >
-        <MoreHorizontal size={18} />
-      </button>
-    </div>
-  );
-  const renderTasks = () => (
-    <section className="panel tasks-panel">
-      <div className="panel-heading">
-        <h2>
-          <span className="section-dot" />
-          今日聚焦 <span className="count">{active.length}</span>
-        </h2>
-        <button
-          className="text-button"
-          onClick={() =>
-            taskModule ? navigate(`modules/${taskModule.id}`) : openModule()
-          }
-        >
-          查看全部 <ArrowUpRight size={15} />
-        </button>
-      </div>
-      <div className="tabs small">
-        <button
-          className={taskTab === "active" ? "active" : ""}
-          onClick={() => setTaskTab("active")}
-        >
-          待完成 <span>{active.length}</span>
-        </button>
-        <button
-          className={taskTab === "done" ? "active" : ""}
-          onClick={() => setTaskTab("done")}
-        >
-          已完成 <span>{done}</span>
-        </button>
-      </div>
-      <div className="task-rows">
-        {taskEntries
-          .filter((e) =>
-            taskTab === "done" ? e.status === "done" : e.status !== "done",
-          )
-          .slice(0, 5)
-          .map((e) => taskRow(e, taskModule!.id))}
-        {!taskEntries.some((e) =>
-          taskTab === "done" ? e.status === "done" : e.status !== "done",
-        ) && (
-          <div className="inline-empty">
-            {taskTab === "active"
-              ? "都完成了，给自己一点休息时间。"
-              : "完成的任务会出现在这里。"}
-          </div>
-        )}
-      </div>
-      <button
-        className="add-task"
-        onClick={() => (taskModule ? openRecord(taskModule.id) : openModule())}
-      >
-        <Plus size={17} />
-        添加一件要做的事<span>＋</span>
-      </button>
-      <div className="task-progress">
-        <span>一点点完成，也是一种前进</span>
-        <div className="progress-track">
-          <i
-            style={{
-              width: `${taskEntries.length ? (done / taskEntries.length) * 100 : 0}%`,
-            }}
-          />
-        </div>
-        <b>
-          {done}/{taskEntries.length}
-        </b>
-      </div>
-    </section>
-  );
   const renderSchedule = () => (
     <section className="panel agenda-panel">
       <div className="panel-heading">
@@ -354,79 +234,29 @@ export default function HomeDashboard({
             {data.name}
             <span className="title-dot">.</span>
           </h1>
-          <p>收拢工作的碎片，找回自己的节奏。</p>
+          <p>先推进今天的事，再把想法和进展留下来。</p>
         </div>
         <div className="heading-actions">
-          <button className="button" onClick={() => navigate("templates")}>
-            <LayoutTemplate size={16} />
-            更换模板
+          <button className="button" onClick={onManageModules}>
+            <SlidersHorizontal size={16} />
+            整理模块
           </button>
-          <button className="button primary" onClick={() => openModule()}>
+          <button className="button primary" onClick={onQuickCapture}>
             <Plus size={17} />
-            新增模块
+            快速记录
           </button>
         </div>
       </div>
-      <section className="welcome-banner">
-        <div className="welcome-content">
-          <span className="tiny-label">
-            A LITTLE SPACE, A LOT OF POSSIBILITIES
-          </span>
-          <h2>把时间，留给重要的事。</h2>
-          <p>
-            当前有 <b>{active.length}</b> 件待办。一步一步，也能走得很远。
-          </p>
-          <button
-            onClick={() => {
-              if (taskModule) {
-                navigate(`modules/${taskModule.id}`);
-              } else openModule();
-            }}
-          >
-            开始今天的工作 <ArrowRight size={16} />
-          </button>
-        </div>
-        <div className="banner-art" aria-hidden="true">
-          <div className="art-orbit orbit-one" />
-          <div className="art-orbit orbit-two" />
-          <div className="art-orbit orbit-three" />
-          <div className="art-sun" />
-          <div className="art-leaf leaf-one" />
-          <div className="art-leaf leaf-two" />
-          <div className="art-line" />
-          <span className="art-caption">
-            MAKE ROOM
-            <br />
-            FOR WHAT MATTERS.
-          </span>
-        </div>
-        <div className="banner-stats">
-          <div>
-            <span>待完成</span>
-            <b>
-              {String(active.length).padStart(2, "0")}
-              <small>件</small>
-            </b>
-          </div>
-          <div>
-            <span>我的模块</span>
-            <b>
-              {String(visible.length).padStart(2, "0")}
-              <small>个</small>
-            </b>
-          </div>
-          <div>
-            <span>今日安排</span>
-            <b>
-              {String(todayEvents.length).padStart(2, "0")}
-              <small>项</small>
-            </b>
-          </div>
-        </div>
-      </section>
       <div className="dashboard-grid">
         <div className="dashboard-primary">
-          {taskModule && renderTasks()}
+          <TodayFocus
+            modules={visible}
+            today={today}
+            navigate={navigate}
+            setStatus={setStatus}
+            onCapture={onQuickCapture}
+          />
+          {agentSummary}
           <section className="module-section">
             <div className="section-heading">
               <h2>
@@ -476,15 +306,6 @@ export default function HomeDashboard({
         <div className="dashboard-secondary">
           {schedule && renderSchedule()}
           {notes && renderNote()}
-          <div className="quiet-quote">
-            <span>“</span>
-            <p>
-              不必把每一分钟填满，
-              <br />
-              专注，也需要留白。
-            </p>
-            <small>A MOMENT FOR YOURSELF</small>
-          </div>
         </div>
       </div>
     </>

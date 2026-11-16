@@ -55,6 +55,7 @@ export type SessionPage = {
   hasMore: boolean;
 };
 export type EventPage = {
+  session?: AgentSession;
   events: AgentEvent[];
   next: string | null;
   hasMore: boolean;

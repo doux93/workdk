@@ -461,3 +461,40 @@ test("详情超过 100 个事件可完整翻页", async () => {
     s.db.close();
   }
 });
+
+test("按会话编号直达返回完整摘要和修正，含特殊字符也可定位，未知会话返回 404", async () => {
+  const s = server();
+  try {
+    const e = event({ session: "研发/100%+?", summary: "可追溯成果" });
+    await send(s, "/api/agent-events", { events: [e] });
+    const list = await (await send(s, "/api/agent-sessions")).json();
+    const session = list.sessions[0];
+    const route =
+      "/api/agent-session?" + new URLSearchParams({ id: session.id });
+    const direct = await (await send(s, route)).json();
+    assert.deepEqual(direct.session, session);
+    assert.equal(direct.events[0].id, e.id);
+    await send(
+      s,
+      "/api/agent-session",
+      {
+        id: session.id,
+        title: "人工确认标题",
+        summary: "修正摘要",
+        project: "新项目",
+      },
+      "PATCH",
+    );
+    const corrected = await (await send(s, route)).json();
+    assert.equal(corrected.session.title_override, "人工确认标题");
+    assert.equal(corrected.session.summary_override, "修正摘要");
+    assert.equal(corrected.events[0].summary, "可追溯成果");
+    assert.equal((await send(s, "/api/agent-session?id=missing")).status, 404);
+    const unauthorized = await handleAgentRequest(req(route), s.adapter, {
+      authorized: false,
+    });
+    assert.equal(unauthorized.status, 401);
+  } finally {
+    s.db.close();
+  }
+});
