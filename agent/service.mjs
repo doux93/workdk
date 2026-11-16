@@ -4,7 +4,10 @@ import {
   MAX_BATCH_BYTES,
   MAX_BATCH_EVENTS,
 } from "./core.mjs";
-export const schemaSql = `CREATE TABLE IF NOT EXISTS agent_events (id TEXT PRIMARY KEY NOT NULL, session_key TEXT NOT NULL, device TEXT NOT NULL, source TEXT NOT NULL, project TEXT NOT NULL, session TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, summary TEXT NOT NULL, evidence TEXT NOT NULL, received_at TEXT NOT NULL);
+import { credentialSchemaSql, issueCredential } from "./credentials.mjs";
+export const schemaSql =
+  credentialSchemaSql +
+  `CREATE TABLE IF NOT EXISTS agent_events (id TEXT PRIMARY KEY NOT NULL, session_key TEXT NOT NULL, device TEXT NOT NULL, source TEXT NOT NULL, project TEXT NOT NULL, session TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, summary TEXT NOT NULL, evidence TEXT NOT NULL, received_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS agent_session_at ON agent_events(session_key, at);
 CREATE INDEX IF NOT EXISTS agent_event_at ON agent_events(at);
 CREATE TABLE IF NOT EXISTS agent_annotations (session_key TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '', project TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);`;
@@ -17,28 +20,120 @@ const json = (data, status = 200) =>
       "X-Content-Type-Options": "nosniff",
     },
   });
-/** @param {Request} request @param {any} db @param {{authorized?:boolean,setup?:object|null}} options */
+/** @param {Request} request @param {any} db @param {{authorized?:boolean,role?:string,device?:string,tokenHash?:string,setup?:any}} options */
 export async function handleAgentRequest(
   request,
   db,
-  { authorized = false, setup = null } = {},
+  { authorized = false, role = "owner", device, tokenHash, setup = null } = {},
 ) {
   if (!authorized) return json({ error: "请登录工作台或检查采集凭据。" }, 401);
   const url = new URL(request.url),
     path = url.pathname;
+  if (
+    role !== "owner" &&
+    !(request.method === "POST" && path === "/api/agent-events")
+  )
+    return json({ error: "设备凭据仅允许上传记录。" }, 403);
   try {
+    if (request.method === "GET" && path === "/api/agent-devices") {
+      const devices = await db.all(
+        "SELECT device,label,created_at,revoked_at FROM agent_devices ORDER BY created_at DESC",
+        [],
+      );
+      return json({ devices });
+    }
+    if (request.method === "PATCH" && path === "/api/agent-devices") {
+      const text = await request.text();
+      if (text.length > 1000) return json({ error: "内容过大" }, 413);
+      const body = JSON.parse(text);
+      if (
+        !body ||
+        typeof body.device !== "string" ||
+        !body.device.trim() ||
+        body.device.length > 200
+      )
+        return json({ error: "设备编号无效" }, 400);
+      const rows = await db.all(
+        "SELECT device FROM agent_devices WHERE device=?",
+        [body.device],
+      );
+      if (!rows.length) return json({ error: "设备不存在" }, 404);
+      await db.batch([
+        {
+          sql: "UPDATE agent_devices SET revoked_at=COALESCE(revoked_at,?) WHERE device=?",
+          args: [new Date().toISOString(), body.device],
+        },
+      ]);
+      return json({ ok: true });
+    }
     if (request.method === "GET" && path === "/api/agent-setup") {
+      // A GET never creates credentials. The fallback page requires an explicit POST.
+      return new Response(
+        `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>连接电脑</title><body><main><h1>连接你的电脑</h1><p>每台电脑使用独立配置。请为电脑命名后下载，勿与其他电脑共用。</p><form method="post"><label>电脑名称 <input name="label" maxlength="80" required></label><button type="submit">生成并下载配置</button></form><p>已有设备请返回工作台的设备列表重新签发，以保留原设备编号和队列。</p><a href="/#agents">返回工作日志</a></main></body></html>`,
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Content-Security-Policy":
+              "default-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      );
+    }
+    if (request.method === "POST" && path === "/api/agent-setup") {
       if (!setup)
         return json({ error: "仅工作台所有者登录后可下载配置。" }, 403);
-      return new Response(JSON.stringify(setup, null, 2), {
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Disposition":
-            'attachment; filename="workdk-agent.config.json"',
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-        },
+      const text = await request.text();
+      if (text.length > 2000) return json({ error: "内容过大" }, 413);
+      const body = request.headers
+        .get("content-type")
+        ?.includes("application/x-www-form-urlencoded")
+        ? Object.fromEntries(new URLSearchParams(text))
+        : JSON.parse(text || "{}");
+      if (
+        !body ||
+        typeof body.label !== "string" ||
+        !body.label.trim() ||
+        body.label.length > 80
+      )
+        return json({ error: "请填写 1–80 字的电脑名称。" }, 400);
+      let device = body.device;
+      if (device !== undefined) {
+        if (typeof device !== "string" || !device.trim() || device.length > 200)
+          return json({ error: "设备编号无效" }, 400);
+        const known = await db.all(
+          "SELECT device FROM agent_devices WHERE device=? UNION SELECT device FROM agent_events WHERE device=? LIMIT 1",
+          [device, device],
+        );
+        if (!known.length) return json({ error: "设备不存在" }, 404);
+      } else device = crypto.randomUUID();
+      const credential = await issueCredential(db, {
+        device,
+        label: body.label.trim(),
       });
+      return new Response(
+        JSON.stringify(
+          {
+            version: 2,
+            url: setup.url,
+            ...credential,
+            ...(setup.serviceToken ? { serviceToken: setup.serviceToken } : {}),
+            projects: [],
+          },
+          null,
+          2,
+        ),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Disposition":
+              'attachment; filename="workdk-agent.config.json"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      );
     }
     if (request.method === "POST" && path === "/api/agent-events") {
       if (Number(request.headers.get("content-length") || 0) > MAX_BATCH_BYTES)
@@ -55,9 +150,13 @@ export async function handleAgentRequest(
         return json({ error: "每批需包含 1–20 个事件" }, 400);
       const normalized = events.map(normalizeEvent),
         received = new Date().toISOString();
+      if (device && normalized.some((e) => e.device !== device))
+        return json({ error: "事件设备与连接配置不一致。" }, 403);
       await db.batch(
         normalized.map((e) => ({
-          sql: "INSERT OR IGNORE INTO agent_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+          sql: tokenHash
+            ? "INSERT OR IGNORE INTO agent_events SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM agent_devices WHERE device=? AND token_hash=? AND revoked_at IS NULL)"
+            : "INSERT OR IGNORE INTO agent_events VALUES (?,?,?,?,?,?,?,?,?,?,?)",
           args: [
             e.id,
             sessionKey(e),
@@ -70,9 +169,21 @@ export async function handleAgentRequest(
             e.summary,
             e.evidence,
             received,
+            ...(tokenHash ? [device, tokenHash] : []),
           ],
         })),
       );
+      // Revocation/rotation may race the asynchronous write. Never ACK skipped writes.
+      if (
+        tokenHash &&
+        !(
+          await db.all(
+            "SELECT device FROM agent_devices WHERE device=? AND token_hash=? AND revoked_at IS NULL",
+            [device, tokenHash],
+          )
+        ).length
+      )
+        return json({ error: "设备凭据已停用，请重新连接。" }, 401);
       return json({ acknowledged: normalized.map((e) => e.id) });
     }
     if (request.method === "GET" && path === "/api/agent-sessions") {

@@ -568,3 +568,43 @@
     min-height: 42px;
   }
 }
+
+.agent-device-management {
+  margin-top: 18px;
+}
+.agent-device-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.agent-device-list li {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+.agent-device-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agent-device-list p {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.agent-device-list .revoked {
+  color: var(--muted);
+}
+.agent-connect label {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.agent-connection-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 18px 0;
+}

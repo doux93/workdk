@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { authorizeAgent } from "./credentials.mjs";
 import { MAX_BATCH_BYTES } from "./core.mjs";
 import { schemaSql, handleAgentRequest } from "./service.mjs";
 
@@ -44,8 +45,11 @@ export function createAgentServer({ db, token }) {
         ...(!["GET", "HEAD"].includes(req.method) ? { body } : {}),
       });
       const response = await handleAgentRequest(request, adapter, {
-        authorized: req.headers.authorization === `Bearer ${token}`,
-        setup: { version: 1, url: origin, token, projects: [] },
+        ...(await authorizeAgent(request, adapter, {
+          adminToken: token,
+          allowedOrigins: ["http://127.0.0.1:5173", "http://localhost:5173"],
+        })),
+        setup: { url: origin },
       });
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(await response.text());

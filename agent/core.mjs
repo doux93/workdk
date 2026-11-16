@@ -22,7 +22,7 @@ const bareCredential = new RegExp(
 export function redact(value) {
   return String(value ?? "")
     .replace(
-      /\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{20,}|github_pat_[\w]{20,})\b/g,
+      /\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{20,}|github_pat_[\w]{20,}|wkdev_[a-f0-9]{64})\b/g,
       "[已隐藏凭据]",
     )
     .replace(
@@ -119,5 +119,13 @@ export function safeConfig(config) {
     )
   )
     throw new Error("项目配置无效");
+  if (
+    (config.version === 2 && !config.device) ||
+    (config.device !== undefined &&
+      (typeof config.device !== "string" ||
+        !config.device.trim() ||
+        config.device.length > 200))
+  )
+    throw new Error("设备配置无效");
   return { ...config, url: url.origin };
 }
