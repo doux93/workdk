@@ -65,6 +65,7 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await page
         .getByRole("button", { name: /展开全部模块与辅助卡片/ })
         .click();
+      await page.evaluate(() => window.scrollTo(0, 0));
       await expect(focus).toContainText("整理下一个迭代计划");
       await expect(focus).not.toContainText("补充昨天的验收记录");
       await expect(focus).not.toContainText("学习内容不混入任务");
