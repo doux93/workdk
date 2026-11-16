@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { MAX_BATCH_BYTES, MAX_BATCH_EVENTS, normalizeEvent } from "./core.mjs";
 export function openQueue(file) {
   mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
@@ -18,9 +19,9 @@ export function openQueue(file) {
     pending() {
       return db
         .prepare(
-          "SELECT payload FROM queue WHERE sent=0 ORDER BY rowid LIMIT 20",
+          "SELECT payload FROM queue WHERE sent=0 ORDER BY rowid LIMIT ?",
         )
-        .all()
+        .all(MAX_BATCH_EVENTS)
         .map((r) => JSON.parse(r.payload));
     },
     ack(ids) {
@@ -61,35 +62,69 @@ export async function flushQueue(queue, config, fetcher = fetch) {
   const events = queue.pending();
   if (!events.length) return 0;
   try {
+    // Reapply current redaction to events retained by an older collector.
+    const pending = events.map(normalizeEvent);
+    const batches = [];
+    let batch = [];
+    for (const event of pending) {
+      const candidate = [...batch, event];
+      if (
+        Buffer.byteLength(JSON.stringify({ events: candidate })) >
+        MAX_BATCH_BYTES
+      ) {
+        if (!batch.length)
+          throw new Error("同步失败：单条事件超过上传限制，请检查本地队列。");
+        batches.push(batch);
+        batch = [];
+      }
+      batch.push(event);
+    }
+    if (batch.length) batches.push(batch);
     const headers = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.token}`,
     };
     if (config.serviceToken)
       headers["OAI-Sites-Authorization"] = `Bearer ${config.serviceToken}`;
-    const response = await fetcher(config.url + "/api/agent-events", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ events }),
-      signal: AbortSignal.timeout(15000),
-      redirect: "error",
-    });
-    if (!response.ok) throw new Error(`同步失败（HTTP ${response.status}）`);
-    const result = await response.json();
-    const sentIds = new Set(events.map((e) => e.id));
-    if (
-      !Array.isArray(result.acknowledged) ||
-      result.acknowledged.some((id) => !sentIds.has(id))
-    )
-      throw new Error("服务器未返回有效保存确认");
-    queue.ack(result.acknowledged);
-    queue.meta("lastSync", new Date().toISOString());
-    queue.meta("error", "");
-    return result.acknowledged.length;
+    async function send(events) {
+      const response = await fetcher(config.url + "/api/agent-events", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ events }),
+        signal: AbortSignal.timeout(15000),
+        redirect: "error",
+      });
+      // Gateways may have a smaller body limit. Split without acknowledging
+      // unconfirmed events; successful halves remain committed if a later half fails.
+      if (response.status === 413 && events.length > 1) {
+        const middle = Math.ceil(events.length / 2);
+        return (
+          (await send(events.slice(0, middle))) +
+          (await send(events.slice(middle)))
+        );
+      }
+      if (!response.ok) throw new Error(`同步失败（HTTP ${response.status}）`);
+      const result = await response.json();
+      const sentIds = new Set(events.map((e) => e.id));
+      if (
+        !Array.isArray(result.acknowledged) ||
+        !result.acknowledged.length ||
+        new Set(result.acknowledged).size !== result.acknowledged.length ||
+        result.acknowledged.some((id) => !sentIds.has(id))
+      )
+        throw new Error("服务器未返回有效保存确认");
+      queue.ack(result.acknowledged);
+      queue.meta("lastSync", new Date().toISOString());
+      queue.meta("error", "");
+      return result.acknowledged.length;
+    }
+    let count = 0;
+    for (const batch of batches) count += await send(batch);
+    return count;
   } catch (e) {
     queue.meta(
       "error",
-      e.message.startsWith("同步失败")
+      e instanceof Error && e.message.startsWith("同步失败")
         ? e.message
         : "连接失败，事件已保留，稍后重试。",
     );

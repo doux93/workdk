@@ -3,10 +3,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'agent/**'
-      - 'public/workdk-agent.zip'
-      - 'tests/windows-install.mjs'
-      - '.github/workflows/windows-agent.yml'
+      - "agent/**"
+      - "public/workdk-agent.zip"
+      - "tests/windows-install.mjs"
+      - ".github/workflows/windows-agent.yml"
+  pull_request:
+    paths:
+      - "agent/**"
+      - "public/workdk-agent.zip"
+      - "tests/windows-install.mjs"
+      - ".github/workflows/windows-agent.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,15 +21,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - name: Check out the exact public commit
-        shell: pwsh
-        run: |
-          git init .
-          git remote add origin "https://github.com/${{ github.repository }}.git"
-          git fetch --depth=1 origin "${{ github.sha }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git checkout --detach FETCH_HEAD
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - name: Test packaged installer and generated hooks on Windows
         shell: pwsh
         run: |

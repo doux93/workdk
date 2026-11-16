@@ -7,14 +7,34 @@ export const KINDS = [
   "interrupt",
   "end",
 ];
+// Shared by the collector and both HTTP receivers. Limits refer to UTF-8 bytes.
+export const MAX_BATCH_BYTES = 500000;
+export const MAX_BATCH_EVENTS = 20;
+const credentialKey = String.raw`["']?\b(?:api[_-]?key|password|passwd|secret|(?:access[_-]?)?token|authorization)["']?\s*[=:]\s*`;
+const quotedCredential = new RegExp(
+  `(${credentialKey})("(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')`,
+  "gi",
+);
+const bareCredential = new RegExp(
+  `(${credentialKey})(?:Bearer\\s+)?[^\\s,;"'}]+`,
+  "gi",
+);
 export function redact(value) {
   return String(value ?? "")
-    .replace(/\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{20,})\b/g, "[已隐藏凭据]")
     .replace(
-      /(["']?(?:api[_-]?key|password|passwd|secret|access[_-]?token|authorization)["']?\s*[=:]\s*["']?)(?:Bearer\s+)?[^\s,;"'}]+/gi,
-      "$1[已隐藏]",
+      /\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{20,}|github_pat_[\w]{20,})\b/g,
+      "[已隐藏凭据]",
     )
-    .replace(/(https?:\/\/[^\s?#]+)\?[^\s]+/g, "$1?[参数已隐藏]");
+    .replace(
+      quotedCredential,
+      (_, prefix, value) => `${prefix}${value[0]}[已隐藏]${value[0]}`,
+    )
+    .replace(bareCredential, "$1[已隐藏]")
+    .replace(/https?:\/\/[^\s<>"']+/gi, (url) =>
+      url
+        .replace(/^(https?:\/\/)[^/?#]*@/i, "$1")
+        .replace(/[?#].*$/, (suffix) => suffix[0] + "[参数已隐藏]"),
+    );
 }
 export function normalizeEvent(input) {
   if (!input || typeof input !== "object") throw new Error("事件必须为对象");

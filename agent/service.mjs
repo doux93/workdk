@@ -1,4 +1,9 @@
-import { normalizeEvent, sessionKey } from "./core.mjs";
+import {
+  normalizeEvent,
+  sessionKey,
+  MAX_BATCH_BYTES,
+  MAX_BATCH_EVENTS,
+} from "./core.mjs";
 export const schemaSql = `CREATE TABLE IF NOT EXISTS agent_events (id TEXT PRIMARY KEY NOT NULL, session_key TEXT NOT NULL, device TEXT NOT NULL, source TEXT NOT NULL, project TEXT NOT NULL, session TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, summary TEXT NOT NULL, evidence TEXT NOT NULL, received_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS agent_session_at ON agent_events(session_key, at);
 CREATE INDEX IF NOT EXISTS agent_event_at ON agent_events(at);
@@ -36,13 +41,17 @@ export async function handleAgentRequest(
       });
     }
     if (request.method === "POST" && path === "/api/agent-events") {
-      if (Number(request.headers.get("content-length") || 0) > 500000)
+      if (Number(request.headers.get("content-length") || 0) > MAX_BATCH_BYTES)
         return json({ error: "单批内容过大" }, 413);
       const text = await request.text();
-      if (new TextEncoder().encode(text).length > 500000)
+      if (new TextEncoder().encode(text).length > MAX_BATCH_BYTES)
         return json({ error: "单批内容过大" }, 413);
       const { events } = JSON.parse(text);
-      if (!Array.isArray(events) || !events.length || events.length > 20)
+      if (
+        !Array.isArray(events) ||
+        !events.length ||
+        events.length > MAX_BATCH_EVENTS
+      )
         return json({ error: "每批需包含 1–20 个事件" }, 400);
       const normalized = events.map(normalizeEvent),
         received = new Date().toISOString();
