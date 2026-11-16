@@ -293,6 +293,20 @@ export default function App() {
       notify(`已切换为${views.find((v) => v.id === view)?.name}，内容已保留。`);
     }
   };
+  const saveIndicator = (
+    <div
+      className={"local-status " + (saveState === "未保存" ? "unsaved" : "")}
+      role="status"
+      aria-label="数据保存状态"
+    >
+      <span />
+      {saveState === "已保存"
+        ? "已保存到当前浏览器"
+        : saveState === "保存中"
+          ? "正在保存更改…"
+          : "当前更改未保存"}
+    </div>
+  );
   return (
     <div className={"app-shell layout-" + data.layout}>
       {sidebar && (
@@ -424,20 +438,7 @@ export default function App() {
             <Settings2 size={18} />
             偏好设置
           </button>
-          <div
-            className={
-              "local-status " + (saveState === "未保存" ? "unsaved" : "")
-            }
-            role="status"
-            aria-label="数据保存状态"
-          >
-            <span />
-            {saveState === "已保存"
-              ? "已保存到当前浏览器"
-              : saveState === "保存中"
-                ? "正在保存更改…"
-                : "当前更改未保存"}
-          </div>
+          {(!narrow || sidebar) && saveIndicator}
         </div>
       </aside>
       <div className="main-shell" inert={narrow && sidebar}>
@@ -497,6 +498,9 @@ export default function App() {
             </button>
           </div>
         </header>
+        {narrow && !sidebar && (
+          <div className="mobile-save-status">{saveIndicator}</div>
+        )}
         <main className="main-content">
           {(recoveryRaw !== null || storageConflict !== null || saveError) && (
             <section className="storage-warning" role="alert">

@@ -4340,8 +4340,13 @@ td:first-child {
 }
 
 /* Daily work: actions first, across purpose-defined modules. */
-.daily-focus {
-  margin-bottom: 20px;
+.daily-focus,
+.dashboard-primary > .agent-today {
+  margin-bottom: 0;
+}
+.daily-focus .panel-heading > .text-button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .focus-caption {
   margin: 8px 0 0;
@@ -4350,7 +4355,7 @@ td:first-child {
 }
 .focus-tabs {
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 12px;
 }
 .focus-row {
   display: flex;
@@ -4453,5 +4458,29 @@ td:first-child {
   }
   .daily-focus .panel-heading {
     gap: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .mobile-save-status {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 20px 0;
+  }
+  .mobile-save-status .local-status {
+    margin: 0;
+    font-size: 10px;
+  }
+  .mobile-save-status + .main-content {
+    padding-top: 16px;
+  }
+  .focus-tabs {
+    gap: 4px;
+  }
+}
+@media (max-width: 480px) {
+  .dashboard-secondary,
+  .layout-focus .dashboard-secondary {
+    align-items: stretch;
   }
 }

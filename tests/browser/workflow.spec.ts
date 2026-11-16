@@ -67,6 +67,17 @@ for (const theme of ["light", "sand", "dark"] as const) {
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
+      await expect(
+        page.getByRole("status", { name: "数据保存状态" }),
+      ).toBeVisible();
+      if (width === 390) {
+        const side = page.locator(".dashboard-secondary");
+        const column = await side.boundingBox();
+        for (const card of await side.locator(":scope > *").all()) {
+          const box = await card.boundingBox();
+          expect(box!.width).toBeCloseTo(column!.width, 0);
+        }
+      }
       await page.screenshot({
         path: info.outputPath("today.png"),
         fullPage: true,
