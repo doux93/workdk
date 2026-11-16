@@ -64,7 +64,7 @@ test("真实 HTTP/SQLite：两个浏览器接续、旧版本冲突与来源关�
     await second.goto("/#home");
     await second
       .getByRole("region", { name: "今日聚焦" })
-      .getByRole("button", { name: /真实服务链路验收/ })
+      .getByRole("button", { name: /^真实服务链路验收/ })
       .click();
     await second.getByRole("button", { name: "查看来源会话" }).click();
     await expect(

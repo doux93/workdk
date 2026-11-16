@@ -1,6 +1,5 @@
 "use client";
 import { saveRecovery } from "../storage/backup";
-("use client");
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   initialWorkspace,

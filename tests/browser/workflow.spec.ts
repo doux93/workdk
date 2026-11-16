@@ -29,7 +29,7 @@ for (const theme of ["light", "sand", "dark"] as const) {
           workspace: (() => {
             const d = initialWorkspace();
             d.theme = theme;
-        d.homeMode = "expanded";
+            d.homeMode = "expanded";
             d.modules.forEach((m) => (m.entries = []));
             d.modules[0].entries = [
               {
@@ -57,6 +57,14 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await page.goto("/#home");
       const focus = page.getByRole("region", { name: "今日聚焦" });
       await expect(focus).toContainText("核对发布结果");
+      await page.getByRole("button", { name: "收起辅助卡片" }).click();
+      await page.screenshot({
+        path: info.outputPath("focused.png"),
+        fullPage: true,
+      });
+      await page
+        .getByRole("button", { name: /展开全部模块与辅助卡片/ })
+        .click();
       await expect(focus).toContainText("整理下一个迭代计划");
       await expect(focus).not.toContainText("补充昨天的验收记录");
       await expect(focus).not.toContainText("学习内容不混入任务");
@@ -103,6 +111,23 @@ for (const theme of ["light", "sand", "dark"] as const) {
       await expect(
         page.getByRole("region", { name: "今日聚焦" }),
       ).toContainText("开始一件新的事");
+      await page.route(/\/api\/workspace-snapshot/, (route) =>
+        route.fulfill({
+          json: { revision: 0, workspace: null, updatedAt: null, history: [] },
+        }),
+      );
+      await page.getByRole("button", { name: "打开个人偏好" }).click();
+      const transfer = page.getByRole("region", { name: "跨设备接续" });
+      await transfer.getByRole("button", { name: "查看云端版本" }).click();
+      await expect(transfer).toContainText("云端尚无快照");
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await transfer.screenshot({
+        path: info.outputPath("snapshot-panel.png"),
+      });
     });
   }
 }

@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const option = process.argv.indexOf("--collector-dir");
@@ -109,9 +109,18 @@ try {
   for (let i = 0; i < 2; i++)
     assert.equal(
       (
-        await run(["--import", homeStub, collector, "install-hooks"], "", {
-          WORKDK_TEST_HOOK_ROOT: hooksRoot,
-        })
+        await run(
+          [
+            "--import",
+            pathToFileURL(homeStub).href,
+            collector,
+            "install-hooks",
+          ],
+          "",
+          {
+            WORKDK_TEST_HOOK_ROOT: hooksRoot,
+          },
+        )
       ).code,
       0,
     );
@@ -120,7 +129,7 @@ try {
   );
   assert.equal(
     installed.hooks.Stop.flatMap((g) => g.hooks).filter((h) =>
-      h.command.includes("collector.mjs"),
+      /collector\.mjs|workdk-hook\.cmd/.test(h.command),
     ).length,
     1,
   );
@@ -216,7 +225,7 @@ try {
   assert.ok(!JSON.stringify(detail.body.events).includes("test-only-secret"));
   assert.ok(!JSON.stringify(detail.body.events).includes("MUST_NOT_UPLOAD"));
   report.checks.apiReadSummaryEvidenceAndRedaction = true;
-  const q = await import(path.join(agent, "queue.mjs"));
+  const q = await import(pathToFileURL(path.join(agent, "queue.mjs")).href);
   const queue = q.openQueue(path.join(state, "events.sqlite"));
   const payloads = queue.db
     .prepare("SELECT payload FROM queue")

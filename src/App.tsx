@@ -37,7 +37,6 @@ import {
   dateKey,
   validateWorkspace,
 } from "./workspace";
-("use client");
 export default function App() {
   const {
     data,
