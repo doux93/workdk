@@ -7,7 +7,16 @@ import { schemaSql } from "../../agent/service.mjs";
 const db = new DatabaseSync(":memory:");
 db.exec(schemaSql);
 const token = randomBytes(32).toString("hex");
-const server = createAgentServer({ db, token });
+const port = process.argv.includes("--port")
+  ? process.argv[process.argv.indexOf("--port") + 1]
+  : "5173";
+if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535)
+  throw new Error("Invalid browser QA port");
+const server = createAgentServer({
+  db,
+  token,
+  allowedOrigins: [`http://127.0.0.1:${port}`, `http://localhost:${port}`],
+});
 await new Promise((resolve, reject) => {
   server.once("error", reject);
   server.listen(8788, "127.0.0.1", resolve);
@@ -16,10 +25,11 @@ const vite = spawn(
   process.execPath,
   [
     "node_modules/vite/bin/vite.js",
+    ...(process.argv.includes("--production") ? ["preview"] : []),
     "--host",
     "127.0.0.1",
     "--port",
-    "5173",
+    port,
     "--strictPort",
   ],
   {

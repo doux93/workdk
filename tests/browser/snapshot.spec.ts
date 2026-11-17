@@ -3,9 +3,10 @@ import { initialWorkspace } from "../../src/workspace";
 
 test("真实 HTTP/SQLite：两个浏览器接续、旧版本冲突与来源关联", async ({
   browser,
+  baseURL,
 }) => {
-  const a = await browser.newContext({ baseURL: "http://127.0.0.1:5173" });
-  const b = await browser.newContext({ baseURL: "http://127.0.0.1:5173" });
+  const a = await browser.newContext({ baseURL });
+  const b = await browser.newContext({ baseURL });
   try {
     const seed = initialWorkspace();
     seed.modules.forEach((m) => (m.entries = []));

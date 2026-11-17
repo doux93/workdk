@@ -7,7 +7,7 @@ npm ci
 npm run check
 ```
 
-`check` 顺序执行 23 项数据测试、59 项 Agent / 服务测试、50 项自动界面测试（共 132 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
+`check` 顺序执行 23 项数据测试、60 项 Agent / 服务测试、50 项自动界面测试（共 133 项），再执行跨进程集成、两组数据量压测、TypeScript/生产构建和采集器下载包一致性检查。任一检查失败时退出为非零状态。也可分别执行 `npm run test:data`、`npm run test:agent`、`npm run test:ui`、`npm run test:integration`、`npm run test:perf` 和 `npm run build`。
 
 ## 自动界面测试
 
@@ -105,6 +105,10 @@ Agent 测试增至 28 项，连同 17 项数据及 21 项界面测试共 66 项�
 
 新增 7 项服务测试：所有者与上传者隔离、快照往返、并发条件写入、JSON / UTF-8 限制、10 版本保留与清理异常、迁移一致性、真实 HTTP 大快照与跨站拒绝。新增 7 项 DOM / 存储测试：主动读取与确认、冲突不覆盖、确认时本机变化、格式与保存状态检查、取消请求、恢复副本失败及跨窗口导入冲突。
 
-浏览器共 18 项。新增流程使用两个独立浏览器上下文，经 Vite 代理调用临时 SQLite / HTTP 服务，验证 Agent 来源 → 待办 → 云端快照 → 第二设备载入 → 来源追溯，以及第二设备更新后的旧版本拒绝。新增窄屏首次使用截图与展开偏好持久化。旧的主题/设备用例仍使用模拟响应。
+浏览器共 19 项。新增流程使用两个独立浏览器上下文，经 Vite 代理调用临时 SQLite / HTTP 服务，验证 Agent 来源 → 待办 → 云端快照 → 第二设备载入 → 来源追溯，以及第二设备更新后的旧版本拒绝。新增窄屏首次使用截图与展开偏好持久化。旧的主题/设备用例仍使用模拟响应。
 
 `tests/browser/live-server.mjs` 只使用内存数据库和随机测试凭据，不读取用户配置；结束后关闭服务。Windows CI 额外运行快照 HTTP 测试和 collector / SQLite / HTTP / MCP 跨进程流程。上述 Agent 事件与 MCP 消息仍为合成载荷，不能代替真实客户端会话或线上平台身份验收。
+
+## 生产构建与手动验收（2026-11-17）
+
+浏览器流程先执行生产构建，再在 4173 端口连接真实临时 SQLite / HTTP 服务；独立上下文使用配置中的 baseURL。新增文件下载、损坏备份拒绝、恢复及恢复副本内容核对。服务测试覆盖默认 5173 / 4173、明确配置的来源、其他端口及匿名写入拒绝。手动实测过程与截图见 [实测记录](RUNTIME-ACCEPTANCE.md)。
