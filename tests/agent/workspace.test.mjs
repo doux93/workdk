@@ -281,3 +281,59 @@ test("真实 HTTP 支持大于事件批次的快照且拒绝跨站、设备及�
     s.db.close();
   }
 });
+
+test("开发与构建预览来源均可保存，显式来源配置仍拒绝其他端口和匿名写入", async () => {
+  for (const origins of [undefined, ["http://127.0.0.1:4321"]]) {
+    const s = fixture();
+    const server = createAgentServer({
+      db: s.db,
+      token: "local-origin-test",
+      ...(origins ? { allowedOrigins: origins } : {}),
+    });
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    const url = `http://127.0.0.1:${server.address().port}/api/workspace-snapshot`;
+    const trusted = origins || [
+      "http://127.0.0.1:5173",
+      "http://localhost:5173",
+      "http://127.0.0.1:4173",
+      "http://localhost:4173",
+    ];
+    let revision = 0;
+    const write = (origin, authenticated = true) =>
+      fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: origin,
+          ...(authenticated
+            ? { Authorization: "Bearer local-origin-test" }
+            : {}),
+        },
+        body: JSON.stringify({
+          baseRevision: revision,
+          workspace: workspace(),
+        }),
+      });
+    try {
+      for (const origin of trusted) {
+        assert.equal((await write(origin)).status, 200);
+        revision++;
+      }
+      for (const origin of [
+        "https://evil.example",
+        "http://localhost.evil.example:4173",
+        "http://127.0.0.1:4322",
+        ...(origins ? ["http://127.0.0.1:5173"] : []),
+      ])
+        assert.equal((await write(origin)).status, 401);
+      assert.equal((await write(trusted[0], false)).status, 401);
+      assert.equal(
+        s.db.prepare("SELECT MAX(revision) n FROM workspace_snapshots").get().n,
+        revision,
+      );
+    } finally {
+      await new Promise((r) => server.close(r));
+      s.db.close();
+    }
+  }
+});

@@ -9,15 +9,16 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
       : {},
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://127.0.0.1:4173",
     locale: "zh-CN",
     timezoneId: "Asia/Tokyo",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "node tests/browser/live-server.mjs",
-    url: "http://127.0.0.1:5173",
+    command:
+      "npm run build && node tests/browser/live-server.mjs --production --port 4173",
+    url: "http://127.0.0.1:4173",
     reuseExistingServer: false,
   },
 });

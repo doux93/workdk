@@ -56,3 +56,7 @@ API 中使用 SQL 参数绑定；日期范围经格式与 Date 验证后生成 I
 3. GET / PUT `/api/workspace-snapshot` 仅允许可信所有者身份。设备或共享上传凭据无权读写。PUT 必须带已查看的 `baseRevision`，条件 INSERT 比较与写入在同一条 SQL 中完成；冲突返回 409。
 4. GET 可带 `?revision=数字` 读取历史版本；默认取最新。最多保留最近 10 份，每份 UTF-8 内容最多 1,500,000 字节，为 D1 单行上限预留空间。无自动多端合并。
 5. 在实际站点检查所有者、非所有者、设备凭据、未登录和跨站请求；确认平台只信任自己的身份头，并已执行迁移。仓库测试不代表这些平台条件已配置。
+
+### 本机构建预览
+
+`npm run build` 后运行 `npm run preview`，同时保持本机 Agent 服务运行，并设置与开发时相同的 `WORKDK_INGEST_TOKEN`。独立服务明确允许本机 `127.0.0.1` / `localhost` 的 5173 开发端口和 4173 预览端口；其他来源仍被拒绝。测试程序如使用其他端口，需通过 `createAgentServer` 的 `allowedOrigins` 参数明确配置，不使用通配符。

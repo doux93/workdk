@@ -8,7 +8,16 @@ import { MAX_BATCH_BYTES } from "./core.mjs";
 import { schemaSql, handleAgentRequest } from "./service.mjs";
 
 // The caller owns the database and server lifecycle (including in integration tests).
-export function createAgentServer({ db, token }) {
+export function createAgentServer({
+  db,
+  token,
+  allowedOrigins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
+  ],
+}) {
   if (!token) throw new Error("请设置 WORKDK_INGEST_TOKEN");
   const adapter = {
     async all(sql, args) {
@@ -52,7 +61,7 @@ export function createAgentServer({ db, token }) {
       const response = await handleAgentRequest(request, adapter, {
         ...(await authorizeAgent(request, adapter, {
           adminToken: token,
-          allowedOrigins: ["http://127.0.0.1:5173", "http://localhost:5173"],
+          allowedOrigins,
         })),
         setup: { url: origin },
       });
